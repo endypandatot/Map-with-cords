@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Яндекс.Карта</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=52c2e7b2-2008-4f6a-b445-d50dd722b668
+&lang=ru_RU" type="text/javascript"></script>
+</head>
+<body>
+    <h2>Яндекс.Карты</h2>
+    <div id="map" style="width: 1850px; height: 850px"></div>
+    <script type="text/javascript">
+        ymaps.ready(init);
+        function init(){
+            var myMap = new ymaps.Map("map", {
+                center: [55.75, 37.57], // Москва
+                zoom: 10
+            });
+        }
+    </script>
+</body>
+</html>
