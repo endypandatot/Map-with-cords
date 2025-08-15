@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8" />
-    <title>Яндекс.Карта</title>
+    <title>Яндекс.Карты</title>
     <script src="https://api-maps.yandex.ru/2.1/?apikey=52c2e7b2-2008-4f6a-b445-d50dd722b668&lang=ru_RU" type="text/javascript"></script>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
         body { font-family: Arial, sans-serif; margin: 16px; background:#f3f6fb; }
-        .container { display: flex; gap: 12px; align-items: flex-start; }
-        #map { width: 1200px; height: 700px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius:8px; overflow:hidden; }
-        .coords-box { width: 320px; padding: 12px; border-radius: 8px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
+        .layout { display: flex; gap: 12px; align-items: flex-start; }
+        #map { width: 900px; height: 700px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius:8px; overflow:hidden; }
+        .panel { width: 320px; padding: 12px; border-radius: 8px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
         .coords { font-family: monospace; color:#004d99; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .fixed-area { margin-top:12px; border-top:1px dashed #e6e9ef; padding-top:10px; }
         button { margin-top:8px; padding:6px 10px; border-radius:6px; border:1px solid #cfd8e7; background:#f7f9fc; cursor:pointer; }
@@ -19,32 +19,53 @@
         .coord-text { font-family: monospace; color:#004d99; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .small-btn { padding:4px 8px; font-size:12px; border-radius:6px; border:1px solid #e0e6f0; background:#fff; cursor:pointer; }
         .small-btn:active { transform:translateY(1px); }
+        label { display:block; margin-top:8px; font-size:13px; color:#333; }
+        input[type="text"], input[type="number"] { width:100%; padding:6px 8px; margin-top:6px; box-sizing:border-box; border-radius:6px; border:1px solid #dfe7f5; }
+        .right-panel { display:flex; flex-direction:column; gap:10px; }
         h2 { margin-bottom:12px; }
     </style>
 </head>
 <body>
     <h2>Яндекс.Карты</h2>
 
-    <div class="container">
+    <div class="layout">
         <div id="map"></div>
 
-        <div class="coords-box" id="coordsBox">
-            <h3>Координаты</h3>
+        <div class="panel">
+            <h3>Координаты курсора</h3>
             <div class="coords" id="coords">Наведите указатель на карту</div>
             <div style="color:#666; font-size:12px; margin-top:8px;">Формат: широта, долгота</div>
 
-            <div class="fixed-area" id="fixedArea">
-                <h4 style="margin:6px 0 8px 0;">Зафиксировано</h4>
-
+            <div class="fixed-area">
+                <h4 style="margin:6px 0 8px 0;">Список</h4>
                 <ul class="coord-list" id="coordList">
-                    <!-- записи добавляются сюда -->
+                    <!-- записи -->
                 </ul>
-
                 <div style="display:flex; gap:8px; margin-top:8px;">
                     <button id="clearBtn" type="button">Очистить список</button>
                 </div>
                 <div style="color:#666; font-size:12px; margin-top:8px;">
                 </div>
+            </div>
+        </div>
+
+        <div class="panel right-panel">
+            <h3>Добавить точку</h3>
+
+            <label for="lat">Широта</label>
+            <input id="lat" type="text" placeholder="" />
+
+            <label for="lon">Долгота </label>
+            <input id="lon" type="text" placeholder="" />
+
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button id="addByInputBtn" type="button">Добавить точку</button>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <button id="clearAllBtn" type="button">Очистить все точки</button>
+            </div>
+            <div style="color:#666; font-size:12px; margin-top:8px;">
             </div>
         </div>
     </div>
@@ -58,25 +79,45 @@
                 controls: []
             });
 
-            try {
-                myMap.controls.add('rulerControl');
-            } catch (e) {
-                console.info('rulerControl не добавлен (возможно, недоступен в этой версии API).');
-            }
+            try { myMap.controls.add('rulerControl'); } catch(e) { console.info('rulerControl не добавлен.'); }
 
             var coordsEl = document.getElementById('coords');
             var coordList = document.getElementById('coordList');
             var clearBtn = document.getElementById('clearBtn');
 
-            var fixedPoints = [];
+            var latInput = document.getElementById('lat');
+            var lonInput = document.getElementById('lon');
+            var addByInputBtn = document.getElementById('addByInputBtn');
+            var clearAllBtn = document.getElementById('clearAllBtn');
+
+            var points = [];
+
+
+            var polyline = new ymaps.GeoObject({
+                geometry: {
+                    type: "LineString",
+                    coordinates: []
+                }
+            }, {
+                strokeColor: "#0077cc",
+                strokeWidth: 4,
+                strokeOpacity: 0.7
+            });
+
+            myMap.geoObjects.add(polyline);
 
             function fmt(coords) {
                 return coords[0].toFixed(6) + ', ' + coords[1].toFixed(6);
             }
 
+            function updatePolyline() {
+                var coords = points.map(function(p){ return p.coords; });
+                polyline.geometry.setCoordinates(coords);
+            }
+
             function renderList() {
                 coordList.innerHTML = '';
-                fixedPoints.forEach(function(item, index){
+                points.forEach(function(item, index){
                     var li = document.createElement('li');
 
                     var text = document.createElement('div');
@@ -87,19 +128,22 @@
                     buttons.style.display = 'flex';
                     buttons.style.gap = '6px';
 
-                    var del = document.createElement('button');
-                    del.className = 'small-btn';
-                    del.textContent = 'Удалить';
-                    del.addEventListener('click', function(){
-                        fixedPoints.splice(index, 1);
-                        renderList();
-                    });
-
                     var zoom = document.createElement('button');
                     zoom.className = 'small-btn';
                     zoom.textContent = 'Показать';
                     zoom.addEventListener('click', function(){
                         myMap.setCenter(item.coords, 14, { duration: 300 });
+                    });
+
+                    var del = document.createElement('button');
+                    del.className = 'small-btn';
+                    del.textContent = 'Удалить';
+                    del.addEventListener('click', function(){
+                        // удалить маркер с карты
+                        if (item.placemark) myMap.geoObjects.remove(item.placemark);
+                        points.splice(index, 1);
+                        updatePolyline();
+                        renderList();
                     });
 
                     buttons.appendChild(zoom);
@@ -110,7 +154,7 @@
                     coordList.appendChild(li);
                 });
 
-                if (fixedPoints.length === 0) {
+                if (points.length === 0) {
                     var emptyLi = document.createElement('li');
                     emptyLi.style.background = 'transparent';
                     emptyLi.style.border = 'none';
@@ -119,16 +163,39 @@
                 }
             }
 
-            renderList();
+            // Добавление маркера и запись в массив points
+            function addPoint(coords, addToList = true) {
+                var lat = Number(coords[0]);
+                var lon = Number(coords[1]);
+                if (!isFinite(lat) || !isFinite(lon)) return;
 
-            var lastApiClickTime = 0;
-            var CLICK_IGNORE_THRESHOLD = 60;
+                var placemark = new ymaps.Placemark([lat, lon], {}, {
+                    preset: 'islands#icon',
+                    iconColor: '#ff5722'
+                });
+
+                myMap.geoObjects.add(placemark);
+
+                var text = fmt([lat, lon]);
+                points.push({ coords: [lat, lon], text: text, placemark: placemark, ts: Date.now() });
+
+                updatePolyline();
+                if (addToList) renderList();
+            }
+
+            function parseInputs() {
+                var lat = latInput.value.trim();
+                var lon = lonInput.value.trim();
+                if (lat === '' || lon === '') return null;
+                var la = Number(lat.replace(',', '.'));
+                var lo = Number(lon.replace(',', '.'));
+                if (!isFinite(la) || !isFinite(lo)) return null;
+                return [la, lo];
+            }
 
             myMap.events.add('mousemove', function (e) {
                 var c = e.get('coords');
-                if (c && Array.isArray(c)) {
-                    coordsEl.textContent = fmt(c);
-                }
+                if (c && Array.isArray(c)) coordsEl.textContent = fmt(c);
             });
 
             var container = myMap.container.getElement();
@@ -136,47 +203,68 @@
                 try {
                     var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
                     var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
-                    if (coords && coords.length === 2) {
-                        coordsEl.textContent = fmt(coords);
-                    }
+                    if (coords && coords.length === 2) coordsEl.textContent = fmt(coords);
                 } catch (err) {}
             }, { passive: true });
 
             container.addEventListener('mouseout', function (evt) {
                 var related = evt.relatedTarget;
-                if (!related || !container.contains(related)) {
-                    coordsEl.textContent = 'Курсор вне карты';
-                }
+                if (!related || !container.contains(related)) coordsEl.textContent = 'Курсор вне карты';
             });
+
+
+            var lastApiClickTime = 0;
+            var CLICK_IGNORE_THRESHOLD = 60;
+
             myMap.events.add('click', function (e) {
                 var c = e.get('coords');
                 if (c && Array.isArray(c)) {
-                    fixedPoints.push({ coords: c, text: fmt(c), ts: Date.now() });
-                    renderList();
+                    addPoint(c, true);
                     lastApiClickTime = Date.now();
                 }
             });
 
             container.addEventListener('click', function (evt) {
                 var now = Date.now();
-                if (Math.abs(now - lastApiClickTime) < CLICK_IGNORE_THRESHOLD) {
-                    return;
-                }
+                if (Math.abs(now - lastApiClickTime) < CLICK_IGNORE_THRESHOLD) return;
                 try {
                     var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
                     var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
                     if (coords && coords.length === 2) {
-                        fixedPoints.push({ coords: coords, text: fmt(coords), ts: Date.now() });
-                        renderList();
+                        addPoint(coords, true);
                         lastApiClickTime = Date.now();
                     }
                 } catch (err) {}
             });
 
-            clearBtn.addEventListener('click', function () {
-                fixedPoints = [];
+            addByInputBtn.addEventListener('click', function () {
+                var coords = parseInputs();
+                if (!coords) {
+                    alert('Введите корректные числа для широты и долготы.');
+                    return;
+                }
+                addPoint(coords, true);
+                myMap.setCenter(coords, 12, { duration: 300 });
+            });
+
+            clearAllBtn.addEventListener('click', function () {
+                points.forEach(function(p){
+                    if (p.placemark) myMap.geoObjects.remove(p.placemark);
+                });
+                points = [];
+                updatePolyline();
                 renderList();
             });
+            clearBtn.addEventListener('click', function () {
+                points.forEach(function(p){
+                    if (p.placemark) myMap.geoObjects.remove(p.placemark);
+                });
+                points = [];
+                updatePolyline();
+                renderList();
+            });
+
+            renderList();
         }
     </script>
 </body>
