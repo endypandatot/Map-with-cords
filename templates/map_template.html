@@ -4,12 +4,22 @@
     <meta charset="UTF-8" />
     <title>Яндекс.Карта</title>
     <script src="https://api-maps.yandex.ru/2.1/?apikey=52c2e7b2-2008-4f6a-b445-d50dd722b668&lang=ru_RU" type="text/javascript"></script>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
-        body { font-family: Arial, sans-serif; margin: 16px; }
+        body { font-family: Arial, sans-serif; margin: 16px; background:#f3f6fb; }
         .container { display: flex; gap: 12px; align-items: flex-start; }
-        #map { width: 1200px; height: 700px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .coords-box { width: 260px; padding: 12px; border-radius: 8px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
-        .coords { font-family: monospace; color:#004d99; }
+        #map { width: 1200px; height: 700px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius:8px; overflow:hidden; }
+        .coords-box { width: 320px; padding: 12px; border-radius: 8px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
+        .coords { font-family: monospace; color:#004d99; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .fixed-area { margin-top:12px; border-top:1px dashed #e6e9ef; padding-top:10px; }
+        button { margin-top:8px; padding:6px 10px; border-radius:6px; border:1px solid #cfd8e7; background:#f7f9fc; cursor:pointer; }
+        button:active { transform:translateY(1px); }
+        ul.coord-list { list-style:none; padding:0; margin:8px 0 0 0; max-height:320px; overflow:auto; }
+        ul.coord-list li { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:6px 8px; border-radius:6px; background:#fbfdff; margin-bottom:6px; border:1px solid #eef3fc; font-size:13px; }
+        .coord-text { font-family: monospace; color:#004d99; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .small-btn { padding:4px 8px; font-size:12px; border-radius:6px; border:1px solid #e0e6f0; background:#fff; cursor:pointer; }
+        .small-btn:active { transform:translateY(1px); }
+        h2 { margin-bottom:12px; }
     </style>
 </head>
 <body>
@@ -22,6 +32,20 @@
             <h3>Координаты</h3>
             <div class="coords" id="coords">Наведите указатель на карту</div>
             <div style="color:#666; font-size:12px; margin-top:8px;">Формат: широта, долгота</div>
+
+            <div class="fixed-area" id="fixedArea">
+                <h4 style="margin:6px 0 8px 0;">Зафиксировано</h4>
+
+                <ul class="coord-list" id="coordList">
+                    <!-- записи добавляются сюда -->
+                </ul>
+
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button id="clearBtn" type="button">Очистить список</button>
+                </div>
+                <div style="color:#666; font-size:12px; margin-top:8px;">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -30,29 +54,128 @@
         function init(){
             var myMap = new ymaps.Map("map", {
                 center: [55.75, 37.57],
-                zoom: 10
+                zoom: 10,
+                controls: []
             });
 
             try {
                 myMap.controls.add('rulerControl');
             } catch (e) {
-                console.info('rulerControl не добавлен (возможно, недоступен в версии API).');
+                console.info('rulerControl не добавлен (возможно, недоступен в этой версии API).');
             }
 
             var coordsEl = document.getElementById('coords');
+            var coordList = document.getElementById('coordList');
+            var clearBtn = document.getElementById('clearBtn');
+
+            var fixedPoints = [];
+
+            function fmt(coords) {
+                return coords[0].toFixed(6) + ', ' + coords[1].toFixed(6);
+            }
+
+            function renderList() {
+                coordList.innerHTML = '';
+                fixedPoints.forEach(function(item, index){
+                    var li = document.createElement('li');
+
+                    var text = document.createElement('div');
+                    text.className = 'coord-text';
+                    text.textContent = (index + 1) + '. ' + item.text;
+
+                    var buttons = document.createElement('div');
+                    buttons.style.display = 'flex';
+                    buttons.style.gap = '6px';
+
+                    var del = document.createElement('button');
+                    del.className = 'small-btn';
+                    del.textContent = 'Удалить';
+                    del.addEventListener('click', function(){
+                        fixedPoints.splice(index, 1);
+                        renderList();
+                    });
+
+                    var zoom = document.createElement('button');
+                    zoom.className = 'small-btn';
+                    zoom.textContent = 'Показать';
+                    zoom.addEventListener('click', function(){
+                        myMap.setCenter(item.coords, 14, { duration: 300 });
+                    });
+
+                    buttons.appendChild(zoom);
+                    buttons.appendChild(del);
+
+                    li.appendChild(text);
+                    li.appendChild(buttons);
+                    coordList.appendChild(li);
+                });
+
+                if (fixedPoints.length === 0) {
+                    var emptyLi = document.createElement('li');
+                    emptyLi.style.background = 'transparent';
+                    emptyLi.style.border = 'none';
+                    emptyLi.textContent = 'Ничего не зафиксировано';
+                    coordList.appendChild(emptyLi);
+                }
+            }
+
+            renderList();
+
+            var lastApiClickTime = 0;
+            var CLICK_IGNORE_THRESHOLD = 60;
 
             myMap.events.add('mousemove', function (e) {
                 var c = e.get('coords');
-                coordsEl.textContent = c[0].toFixed(6) + ', ' + c[1].toFixed(6);
+                if (c && Array.isArray(c)) {
+                    coordsEl.textContent = fmt(c);
+                }
             });
 
-            myMap.events.add('mouseleave', function () {
-                coordsEl.textContent = 'Курсор вне карты';
-            });
+            var container = myMap.container.getElement();
+            container.addEventListener('mousemove', function (evt) {
+                try {
+                    var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
+                    var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
+                    if (coords && coords.length === 2) {
+                        coordsEl.textContent = fmt(coords);
+                    }
+                } catch (err) {}
+            }, { passive: true });
 
+            container.addEventListener('mouseout', function (evt) {
+                var related = evt.relatedTarget;
+                if (!related || !container.contains(related)) {
+                    coordsEl.textContent = 'Курсор вне карты';
+                }
+            });
             myMap.events.add('click', function (e) {
                 var c = e.get('coords');
-                coordsEl.textContent = c[0].toFixed(6) + ', ' + c[1].toFixed(6);
+                if (c && Array.isArray(c)) {
+                    fixedPoints.push({ coords: c, text: fmt(c), ts: Date.now() });
+                    renderList();
+                    lastApiClickTime = Date.now();
+                }
+            });
+
+            container.addEventListener('click', function (evt) {
+                var now = Date.now();
+                if (Math.abs(now - lastApiClickTime) < CLICK_IGNORE_THRESHOLD) {
+                    return;
+                }
+                try {
+                    var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
+                    var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
+                    if (coords && coords.length === 2) {
+                        fixedPoints.push({ coords: coords, text: fmt(coords), ts: Date.now() });
+                        renderList();
+                        lastApiClickTime = Date.now();
+                    }
+                } catch (err) {}
+            });
+
+            clearBtn.addEventListener('click', function () {
+                fixedPoints = [];
+                renderList();
             });
         }
     </script>
