@@ -1,271 +1,454 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <title>Яндекс.Карты</title>
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=52c2e7b2-2008-4f6a-b445-d50dd722b668&lang=ru_RU" type="text/javascript"></script>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <style>
-        body { font-family: Arial, sans-serif; margin: 16px; background:#f3f6fb; }
-        .layout { display: flex; gap: 12px; align-items: flex-start; }
-        #map { width: 900px; height: 700px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border-radius:8px; overflow:hidden; }
-        .panel { width: 320px; padding: 12px; border-radius: 8px; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
-        .coords { font-family: monospace; color:#004d99; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .fixed-area { margin-top:12px; border-top:1px dashed #e6e9ef; padding-top:10px; }
-        button { margin-top:8px; padding:6px 10px; border-radius:6px; border:1px solid #cfd8e7; background:#f7f9fc; cursor:pointer; }
-        button:active { transform:translateY(1px); }
-        ul.coord-list { list-style:none; padding:0; margin:8px 0 0 0; max-height:320px; overflow:auto; }
-        ul.coord-list li { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:6px 8px; border-radius:6px; background:#fbfdff; margin-bottom:6px; border:1px solid #eef3fc; font-size:13px; }
-        .coord-text { font-family: monospace; color:#004d99; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .small-btn { padding:4px 8px; font-size:12px; border-radius:6px; border:1px solid #e0e6f0; background:#fff; cursor:pointer; }
-        .small-btn:active { transform:translateY(1px); }
-        label { display:block; margin-top:8px; font-size:13px; color:#333; }
-        input[type="text"], input[type="number"] { width:100%; padding:6px 8px; margin-top:6px; box-sizing:border-box; border-radius:6px; border:1px solid #dfe7f5; }
-        .right-panel { display:flex; flex-direction:column; gap:10px; }
-        h2 { margin-bottom:12px; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Яндекс.Карты</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+  <style>
+    :root{--bg:#f7f9fc;--panel:#fff;--accent:#0077cc;--accent2:#ff5722}
+    body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#111}
+    .layout{display:grid;grid-template-columns:360px 1fr;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
+    .panel{background:var(--panel);border-radius:8px;padding:4px;box-shadow:0 1px 6px rgba(10,20,30,.06);display:flex;flex-direction:column;gap:8px}
+    h3{margin:0 0 6px 0;font-size:15px}
+    #map{border-radius:8px;overflow:hidden;height:100%}
+    .coord-row{font-size:13px;color:#333;background:#f5f8fb;padding:8px;border-radius:6px}
+    .coord-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+    .coord-item{display:flex;justify-content:space-between;gap:6px;padding:8px;border-radius:6px;background:#fff;align-items:center;border:1px solid #eef3f8}
+    .coord-text{font-size:13px;color:#222}
+    .small-btn{background:transparent;border:1px solid #e0e6ee;color:var(--accent);padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
+    .small-btn.danger{color:#c62828;border-color:#f8d7da}
+    .actions{display:flex;gap:6px}
+    .form-row{display:flex;gap:6px}
+    input[type="text"]{padding:8px;border-radius:6px;border:1px solid #dfe9f5;flex:1}
+    button.primary{background:var(--accent);color:#fff;padding:8px 12px;border-radius:6px;border:none;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid #d0d9e6;padding:8px 10px;border-radius:6px;cursor:pointer}
+    .routes-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
+    .route-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:6px;background:#fff;border:1px solid #eef3f8}
+    .meta{font-size:12px;color:#666}
+    .name-input{border:1px solid #dfe9f5;padding:6px;border-radius:6px;width:100%}
+    .footer-row{display:flex;gap:8px;justify-content:space-between;align-items:center}
+    .muted{font-size:12px;color:#666}
+    .modal{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35)}
+    .modal-card{background:#fff;padding:16px;border-radius:8px;width:340px;box-shadow:0 6px 30px rgba(10,20,30,0.2)}
+  </style>
 </head>
 <body>
-    <h2>Яндекс.Карты</h2>
+  <div class="layout">
+    <div class="panel" id="left-panel">
+      <h3>Список точек</h3>
+      <div class="coord-row" id="coords-display">Курсор вне карты</div>
+      <ul class="coord-list" id="coord-list"></ul>
 
-    <div class="layout">
-        <div id="map"></div>
-
-        <div class="panel">
-            <h3>Координаты курсора</h3>
-            <div class="coords" id="coords">Наведите указатель на карту</div>
-            <div style="color:#666; font-size:12px; margin-top:8px;">Формат: широта, долгота</div>
-
-            <div class="fixed-area">
-                <h4 style="margin:6px 0 8px 0;">Список</h4>
-                <ul class="coord-list" id="coordList">
-                    <!-- записи -->
-                </ul>
-                <div style="display:flex; gap:8px; margin-top:8px;">
-                    <button id="clearBtn" type="button">Очистить список</button>
-                </div>
-                <div style="color:#666; font-size:12px; margin-top:8px;">
-                </div>
-            </div>
+      <div class="footer-row" style="margin-top:8px">
+        <div style="display:flex;gap:8px">
+          <button id="clear-btn" class="small-btn">Очистить список</button>
+          <button id="save-route-btn" class="primary">Сохранить маршрут</button>
         </div>
+        <div class="muted" id="points-count">0 точек</div>
+      </div>
 
-        <div class="panel right-panel">
-            <h3>Добавить точку</h3>
+      <hr style="margin:10px 0"/>
 
-            <label for="lat">Широта</label>
-            <input id="lat" type="text" placeholder="" />
+      <h3>Добавить точку</h3>
+      <div class="form-row">
+        <input id="lat-input" type="text" placeholder="Широта" />
+        <input id="lon-input" type="text" placeholder="Долгота" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="add-by-input" class="primary">Добавить точку</button>
+        <button id="clear-all-btn" class="ghost">Очистить всё</button>
+      </div>
 
-            <label for="lon">Долгота </label>
-            <input id="lon" type="text" placeholder="" />
+      <hr style="margin:10px 0"/>
 
-            <div style="display:flex; gap:8px; margin-top:8px;">
-                <button id="addByInputBtn" type="button">Добавить точку</button>
-            </div>
-
-            <div style="display:flex; gap:8px; margin-top:6px;">
-                <button id="clearAllBtn" type="button">Очистить все точки</button>
-            </div>
-            <div style="color:#666; font-size:12px; margin-top:8px;">
-            </div>
-        </div>
+      <h3>Маршруты</h3>
+      <ul class="routes-list" id="routes-list"></ul>
     </div>
 
-    <script type="text/javascript">
-        ymaps.ready(init);
-        function init(){
-            var myMap = new ymaps.Map("map", {
-                center: [55.75, 37.57],
-                zoom: 10,
-                controls: []
-            });
+    <div id="map"></div>
+  </div>
 
-            try { myMap.controls.add('rulerControl'); } catch(e) { console.info('rulerControl не добавлен.'); }
+  <div id="save-modal" class="modal" style="display:none">
+    <div class="modal-card">
+      <h4 style="margin-top:0" id="modal-title">Сохранить маршрут</h4>
+      <div style="margin-bottom:8px">Точек в маршруте: <span id="modal-points-count">0</span></div>
+      <input id="route-name-input" class="name-input" placeholder="Название маршрута" />
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button id="modal-cancel" class="ghost">Отмена</button>
+        <button id="modal-save" class="primary">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
-            var coordsEl = document.getElementById('coords');
-            var coordList = document.getElementById('coordList');
-            var clearBtn = document.getElementById('clearBtn');
+  <script>
+    ymaps.ready(init);
 
-            var latInput = document.getElementById('lat');
-            var lonInput = document.getElementById('lon');
-            var addByInputBtn = document.getElementById('addByInputBtn');
-            var clearAllBtn = document.getElementById('clearAllBtn');
+    function init() {
+      var myMap = new ymaps.Map("map", {
+        center: [55.75, 37.57],
+        zoom: 10,
+        controls: []
+      });
+      try { myMap.controls.add('rulerControl'); } catch (e) {}
 
-            var points = [];
+      var coordsDisplay = document.getElementById('coords-display');
+      var coordList = document.getElementById('coord-list');
+      var clearBtn = document.getElementById('clear-btn');
+      var saveRouteBtn = document.getElementById('save-route-btn');
+      var pointsCountEl = document.getElementById('points-count');
 
+      var latInput = document.getElementById('lat-input');
+      var lonInput = document.getElementById('lon-input');
+      var addByInputBtn = document.getElementById('add-by-input');
+      var clearAllBtn = document.getElementById('clear-all-btn');
 
-            var polyline = new ymaps.GeoObject({
-                geometry: {
-                    type: "LineString",
-                    coordinates: []
-                }
-            }, {
-                strokeColor: "#0077cc",
-                strokeWidth: 4,
-                strokeOpacity: 0.7
-            });
+      var routesListEl = document.getElementById('routes-list');
+      var exportJsonBtn = document.getElementById('export-json-btn');
+      var importJsonBtn = document.getElementById('import-json-btn');
 
-            myMap.geoObjects.add(polyline);
+      var saveModal = document.getElementById('save-modal');
+      var modalPointsCount = document.getElementById('modal-points-count');
+      var routeNameInput = document.getElementById('route-name-input');
+      var modalCancel = document.getElementById('modal-cancel');
+      var modalSave = document.getElementById('modal-save');
+      var modalTitle = document.getElementById('modal-title');
 
-            function fmt(coords) {
-                return coords[0].toFixed(6) + ', ' + coords[1].toFixed(6);
-            }
+      var points = [];
+      var routes = loadRoutesFromStorage();
 
-            function updatePolyline() {
-                var coords = points.map(function(p){ return p.coords; });
-                polyline.geometry.setCoordinates(coords);
-            }
+      var currentEditingRouteId = null;
 
-            function renderList() {
-                coordList.innerHTML = '';
-                points.forEach(function(item, index){
-                    var li = document.createElement('li');
-
-                    var text = document.createElement('div');
-                    text.className = 'coord-text';
-                    text.textContent = (index + 1) + '. ' + item.text;
-
-                    var buttons = document.createElement('div');
-                    buttons.style.display = 'flex';
-                    buttons.style.gap = '6px';
-
-                    var zoom = document.createElement('button');
-                    zoom.className = 'small-btn';
-                    zoom.textContent = 'Показать';
-                    zoom.addEventListener('click', function(){
-                        myMap.setCenter(item.coords, 14, { duration: 300 });
-                    });
-
-                    var del = document.createElement('button');
-                    del.className = 'small-btn';
-                    del.textContent = 'Удалить';
-                    del.addEventListener('click', function(){
-                        // удалить маркер с карты
-                        if (item.placemark) myMap.geoObjects.remove(item.placemark);
-                        points.splice(index, 1);
-                        updatePolyline();
-                        renderList();
-                    });
-
-                    buttons.appendChild(zoom);
-                    buttons.appendChild(del);
-
-                    li.appendChild(text);
-                    li.appendChild(buttons);
-                    coordList.appendChild(li);
-                });
-
-                if (points.length === 0) {
-                    var emptyLi = document.createElement('li');
-                    emptyLi.style.background = 'transparent';
-                    emptyLi.style.border = 'none';
-                    emptyLi.textContent = 'Ничего не зафиксировано';
-                    coordList.appendChild(emptyLi);
-                }
-            }
-
-            // Добавление маркера и запись в массив points
-            function addPoint(coords, addToList = true) {
-                var lat = Number(coords[0]);
-                var lon = Number(coords[1]);
-                if (!isFinite(lat) || !isFinite(lon)) return;
-
-                var placemark = new ymaps.Placemark([lat, lon], {}, {
-                    preset: 'islands#icon',
-                    iconColor: '#ff5722'
-                });
-
-                myMap.geoObjects.add(placemark);
-
-                var text = fmt([lat, lon]);
-                points.push({ coords: [lat, lon], text: text, placemark: placemark, ts: Date.now() });
-
-                updatePolyline();
-                if (addToList) renderList();
-            }
-
-            function parseInputs() {
-                var lat = latInput.value.trim();
-                var lon = lonInput.value.trim();
-                if (lat === '' || lon === '') return null;
-                var la = Number(lat.replace(',', '.'));
-                var lo = Number(lon.replace(',', '.'));
-                if (!isFinite(la) || !isFinite(lo)) return null;
-                return [la, lo];
-            }
-
-            myMap.events.add('mousemove', function (e) {
-                var c = e.get('coords');
-                if (c && Array.isArray(c)) coordsEl.textContent = fmt(c);
-            });
-
-            var container = myMap.container.getElement();
-            container.addEventListener('mousemove', function (evt) {
-                try {
-                    var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
-                    var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
-                    if (coords && coords.length === 2) coordsEl.textContent = fmt(coords);
-                } catch (err) {}
-            }, { passive: true });
-
-            container.addEventListener('mouseout', function (evt) {
-                var related = evt.relatedTarget;
-                if (!related || !container.contains(related)) coordsEl.textContent = 'Курсор вне карты';
-            });
+      var polyline = new ymaps.GeoObject({
+        geometry: { type: "LineString", coordinates: [] }
+      }, {
+        strokeColor: "#0077cc",
+        strokeWidth: 4,
+        strokeOpacity: 0.8
+      });
+      myMap.geoObjects.add(polyline);
 
 
-            var lastApiClickTime = 0;
-            var CLICK_IGNORE_THRESHOLD = 60;
+      function fmt(coords) { return Number(coords[0]).toFixed(6) + ', ' + Number(coords[1]).toFixed(6); }
+      function genId(prefix) { return (prefix||'id') + '-' + Date.now() + '-' + Math.floor(Math.random()*10000); }
+      function updatePointsCount() { pointsCountEl.textContent = points.length + ' точек'; }
 
-            myMap.events.add('click', function (e) {
-                var c = e.get('coords');
-                if (c && Array.isArray(c)) {
-                    addPoint(c, true);
-                    lastApiClickTime = Date.now();
-                }
-            });
+      function updatePolyline() {
+        var coords = points.map(p => p.coords);
+        polyline.geometry.setCoordinates(coords);
+      }
 
-            container.addEventListener('click', function (evt) {
-                var now = Date.now();
-                if (Math.abs(now - lastApiClickTime) < CLICK_IGNORE_THRESHOLD) return;
-                try {
-                    var globalPixels = myMap.converter.pageToGlobal([evt.pageX, evt.pageY]);
-                    var coords = myMap.options.get('projection').fromGlobalPixels(globalPixels, myMap.getZoom());
-                    if (coords && coords.length === 2) {
-                        addPoint(coords, true);
-                        lastApiClickTime = Date.now();
-                    }
-                } catch (err) {}
-            });
+      function clearPoints() {
+        points.forEach(p => { if (p.placemark) myMap.geoObjects.remove(p.placemark); });
+        points.length = 0;
+        updatePolyline();
+        renderList();
+        updatePointsCount();
+        currentEditingRouteId = null;
+      }
 
-            addByInputBtn.addEventListener('click', function () {
-                var coords = parseInputs();
-                if (!coords) {
-                    alert('Введите корректные числа для широты и долготы.');
-                    return;
-                }
-                addPoint(coords, true);
-                myMap.setCenter(coords, 12, { duration: 300 });
-            });
+      function addPoint(coords, addToList = true) {
+        var lat = Number(coords[0]);
+        var lon = Number(coords[1]);
+        if (!isFinite(lat) || !isFinite(lon)) return;
+        var id = genId('pt');
+        var placemark = new ymaps.Placemark([lat, lon], { id: id }, { preset: 'islands#icon', iconColor: '#ff5722' });
+        myMap.geoObjects.add(placemark);
+        var item = { id: id, coords: [lat, lon], placemark: placemark, ts: Date.now() };
+        points.push(item);
+        updatePolyline();
+        if (addToList) renderList();
+      }
 
-            clearAllBtn.addEventListener('click', function () {
-                points.forEach(function(p){
-                    if (p.placemark) myMap.geoObjects.remove(p.placemark);
-                });
-                points = [];
-                updatePolyline();
-                renderList();
-            });
-            clearBtn.addEventListener('click', function () {
-                points.forEach(function(p){
-                    if (p.placemark) myMap.geoObjects.remove(p.placemark);
-                });
-                points = [];
-                updatePolyline();
-                renderList();
-            });
-
-            renderList();
+      function renderList() {
+        coordList.innerHTML = '';
+        if (points.length === 0) {
+          var el = document.createElement('div');
+          el.className = 'muted';
+          el.textContent = 'Ничего не зафиксировано';
+          coordList.appendChild(el);
+          return;
         }
-    </script>
+        points.forEach(function(item, idx) {
+          var li = document.createElement('li');
+          li.className = 'coord-item';
+
+          var left = document.createElement('div');
+          left.style.display = 'flex';
+          left.style.flexDirection = 'column';
+
+          var text = document.createElement('div');
+          text.className = 'coord-text';
+          text.textContent = (idx+1) + '. ' + fmt(item.coords);
+          left.appendChild(text);
+
+          var meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = 'id: ' + item.id;
+          left.appendChild(meta);
+
+          var actions = document.createElement('div');
+          actions.className = 'actions';
+
+          var showBtn = document.createElement('button');
+          showBtn.className = 'small-btn';
+          showBtn.textContent = 'Показать';
+          showBtn.addEventListener('click', function() {
+            myMap.setCenter(item.coords, 14, { duration: 300 });
+            if (item.placemark) item.placemark.balloon.open();
+          });
+
+          var upBtn = document.createElement('button');
+          upBtn.className = 'small-btn';
+          upBtn.textContent = '↑';
+          upBtn.title = 'Переместить вверх';
+          upBtn.addEventListener('click', function() {
+            var i = points.findIndex(p => p.id === item.id);
+            if (i > 0) {
+              var tmp = points[i-1];
+              points[i-1] = points[i];
+              points[i] = tmp;
+              updatePolyline(); renderList();
+            }
+          });
+
+          var downBtn = document.createElement('button');
+          downBtn.className = 'small-btn';
+          downBtn.textContent = '↓';
+          downBtn.title = 'Переместить вниз';
+          downBtn.addEventListener('click', function() {
+            var i = points.findIndex(p => p.id === item.id);
+            if (i !== -1 && i < points.length - 1) {
+              var tmp = points[i+1];
+              points[i+1] = points[i];
+              points[i] = tmp;
+              updatePolyline(); renderList();
+            }
+          });
+
+          var delBtn = document.createElement('button');
+          delBtn.className = 'small-btn danger';
+          delBtn.textContent = 'Удалить';
+          delBtn.addEventListener('click', function() {
+            if (item.placemark) myMap.geoObjects.remove(item.placemark);
+            var i = points.findIndex(p => p.id === item.id);
+            if (i !== -1) points.splice(i,1);
+            updatePolyline();
+            renderList();
+            updatePointsCount();
+          });
+
+          actions.appendChild(showBtn);
+          actions.appendChild(upBtn);
+          actions.appendChild(downBtn);
+          actions.appendChild(delBtn);
+
+          li.appendChild(left);
+          li.appendChild(actions);
+          coordList.appendChild(li);
+        });
+      }
+      myMap.events.add('mousemove', function (e) {
+        var c = e.get('coords');
+        if (c && Array.isArray(c)) coordsDisplay.textContent = fmt(c);
+      });
+      var container = myMap.container.getElement();
+      container.addEventListener('mouseout', function() { coordsDisplay.textContent = 'Курсор вне карты'; }, { passive: true });
+
+      myMap.events.add('click', function (e) {
+        var c = e.get('coords');
+        if (c && Array.isArray(c)) {
+          addPoint(c, true);
+        }
+      });
+
+      addByInputBtn.addEventListener('click', function() {
+        var coords = parseInputs();
+        if (!coords) { alert('Введите корректные числа для широты и долготы.'); return; }
+        addPoint(coords, true);
+        myMap.setCenter(coords, 12, { duration: 300 });
+      });
+
+      clearBtn.addEventListener('click', function(){ clearPoints(); });
+      clearAllBtn.addEventListener('click', function(){ clearPoints(); });
+
+      function parseInputs() {
+        var lat = latInput.value.trim();
+        var lon = lonInput.value.trim();
+        if (lat === '' || lon === '') return null;
+        var la = Number(lat.replace(',', '.'));
+        var lo = Number(lon.replace(',', '.'));
+        if (!isFinite(la) || !isFinite(lo)) return null;
+        if (la < -90 || la > 90 || lo < -180 || lo > 180) return null;
+        return [la, lo];
+      }
+      function saveRoutesToStorage() {
+        try {
+          var plain = routes.map(r => ({ id:r.id, name:r.name, coords:r.coords, createdAt:r.createdAt }));
+          localStorage.setItem('saved_routes_v1', JSON.stringify(plain));
+        } catch (e) { console.warn('Не удалось сохранить маршруты', e); }
+      }
+
+      function loadRoutesFromStorage() {
+        try {
+          var raw = localStorage.getItem('saved_routes_v1');
+          if (!raw) return [];
+          var parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          return parsed.map(r => ({ id:r.id, name:r.name, coords:r.coords || [], createdAt:r.createdAt || Date.now() }));
+        } catch (e) { console.warn('Не удалось загрузить маршруты', e); return []; }
+      }
+
+      function renderRoutesList() {
+        routesListEl.innerHTML = '';
+        if (!routes || routes.length === 0) {
+          var el = document.createElement('div');
+          el.className = 'muted';
+          el.textContent = 'Нет сохранённых маршрутов';
+          routesListEl.appendChild(el);
+          return;
+        }
+        routes.forEach(function(route) {
+          var li = document.createElement('li');
+          li.className = 'route-item';
+
+          var left = document.createElement('div');
+          left.style.display = 'flex';
+          left.style.flexDirection = 'column';
+          left.style.flex = '1';
+
+          var name = document.createElement('div');
+          name.style.display = 'flex';
+          name.style.gap = '8px';
+          var nameText = document.createElement('div');
+          nameText.textContent = route.name || '(Без названия)';
+          nameText.style.fontWeight = '600';
+          name.appendChild(nameText);
+
+          var meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = route.coords.length + ' точек';
+          left.appendChild(name);
+          left.appendChild(meta);
+
+          var actions = document.createElement('div');
+          actions.style.display = 'flex';
+          actions.style.gap = '6px';
+
+          var showBtn = document.createElement('button');
+          showBtn.className = 'small-btn';
+          showBtn.textContent = 'Показать';
+          showBtn.addEventListener('click', function() {
+            loadRouteOnMap(route.id);
+          });
+
+          var renameBtn = document.createElement('button');
+          renameBtn.className = 'small-btn';
+          renameBtn.textContent = 'Изменить';
+          renameBtn.addEventListener('click', function() {
+            var newName = prompt('Новое название маршрута', route.name || '');
+            if (newName === null) return;
+            route.name = newName.trim() || '(Без названия)';
+            saveRoutesToStorage();
+            renderRoutesList();
+            if (currentEditingRouteId === route.id) {
+            }
+          });
+
+          var delBtn = document.createElement('button');
+          delBtn.className = 'small-btn danger';
+          delBtn.textContent = 'Удалить';
+          delBtn.addEventListener('click', function() {
+            if (!confirm('Удалить маршрут "' + route.name + '"?')) return;
+            var i = routes.findIndex(r => r.id === route.id);
+            if (i !== -1) routes.splice(i,1);
+            saveRoutesToStorage();
+            renderRoutesList();
+            if (currentEditingRouteId === route.id) {
+              currentEditingRouteId = null;
+            }
+          });
+
+          actions.appendChild(showBtn);
+          actions.appendChild(renameBtn);
+          actions.appendChild(delBtn);
+
+          li.appendChild(left);
+          li.appendChild(actions);
+          routesListEl.appendChild(li);
+        });
+      }
+
+      function loadRouteOnMap(routeId) {
+        var route = routes.find(r => r.id === routeId);
+        if (!route) return;
+        points.forEach(p => { if (p.placemark) myMap.geoObjects.remove(p.placemark); });
+        points.length = 0;
+        route.coords.forEach(function(c){ addPoint(c, false); });
+        renderList();
+        updatePointsCount();
+        updatePolyline();
+        if (route.coords.length > 0) myMap.setCenter(route.coords[0], 12, { duration: 300 });
+        currentEditingRouteId = route.id;
+        saveRouteBtn.textContent = 'Перезаписать';
+      }
+
+      function saveCurrentPointsAsRoute(name) {
+        if (points.length === 0) { alert('Нет точек для сохранения'); return; }
+        if (currentEditingRouteId) {
+          var route = routes.find(r => r.id === currentEditingRouteId);
+          if (!route) {
+            var newRoute = { id: genId('route'), name: name || ('Маршрут ' + (new Date()).toLocaleString()), coords: points.map(p => p.coords), createdAt: Date.now() };
+            routes.push(newRoute);
+            currentEditingRouteId = newRoute.id;
+          } else {
+            route.coords = points.map(p => p.coords);
+            route.name = name || route.name || ('Маршрут ' + (new Date()).toLocaleString());
+          }
+        } else {
+          var route = {
+            id: genId('route'),
+            name: name || ('Маршрут ' + (new Date()).toLocaleString()),
+            coords: points.map(p => p.coords),
+            createdAt: Date.now()
+          };
+          routes.push(route);
+          currentEditingRouteId = route.id;
+        }
+        saveRoutesToStorage();
+        renderRoutesList();
+        saveRouteBtn.textContent = 'Сохранить';
+      }
+
+      // Save modal handlers
+      saveRouteBtn.addEventListener('click', function() {
+        if (points.length === 0) { alert('Нет точек для сохранения'); return; }
+        modalPointsCount.textContent = points.length;
+        var initialName = 'Маршрут ' + (new Date()).toLocaleString();
+        if (currentEditingRouteId) {
+          var r = routes.find(rr => rr.id === currentEditingRouteId);
+          if (r) initialName = r.name || initialName;
+          modalTitle.textContent = 'Перезаписать маршрут';
+        } else {
+          modalTitle.textContent = 'Сохранить маршрут';
+        }
+        routeNameInput.value = initialName;
+        saveModal.style.display = 'flex';
+        routeNameInput.focus();
+      });
+
+      modalCancel.addEventListener('click', function(){ saveModal.style.display = 'none'; });
+      modalSave.addEventListener('click', function() {
+        var name = routeNameInput.value.trim() || ('Маршрут ' + (new Date()).toLocaleString());
+        saveCurrentPointsAsRoute(name);
+        saveModal.style.display = 'none';
+      });
+
+      renderList();
+      renderRoutesList();
+      updatePointsCount();
+
+    }
+  </script>
 </body>
 </html>
