@@ -2,9 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.views.decorators.http import require_POST
 from PIL import Image
-from django.http import JsonResponse, HttpResponseBadRequest
-from .models import Point
 import json
+from .models import Point, Route
 
 def map_view(request):
     points = Point.objects.all()
@@ -12,10 +11,6 @@ def map_view(request):
 
 @require_POST
 def create_point(request):
-    """
-    Ожидает JSON: { "lat": 55.75, "lon": 37.61 }
-    Возвращает текст — pk новой точки (plain text).
-    """
     try:
         data = json.loads(request.body.decode('utf-8'))
         lat = float(data.get('lat'))
@@ -26,7 +21,6 @@ def create_point(request):
     # Сохраняем точку в БД
     p = Point.objects.create(lat=lat, lon=lon)
     return HttpResponse(str(p.pk))
-
 
 @require_POST
 def upload_point_image(request, pk):
@@ -43,5 +37,3 @@ def upload_point_image(request, pk):
         return HttpResponseBadRequest('Invalid image')
     point.image.save(uploaded.name, uploaded, save=True)
     return HttpResponse(point.image.url)
-
-

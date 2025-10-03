@@ -1,0 +1,775 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body, html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+.main-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.routes-container {
+    width: 552px;
+    min-width: 552px;
+    height: 100vh;
+    position: relative;
+    background: #FDF9F6;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+    padding: 16px;
+}
+
+/* --- Главный экран --- */
+.routes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+}
+
+.routes-title {
+    color: #30372D;
+    font-size: 24px;
+    font-weight: 400;
+}
+
+.add-route-btn {
+    cursor: pointer;
+}
+
+.main-list-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Важно для flexbox */
+}
+
+
+.routes-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 12px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.routes-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* --- Стили для карточки маршрута (версия для макета) --- */
+.route-item {
+    width: 100%;
+    padding: 12px;
+    background: #FDF9F6;
+    border-radius: 6px;
+    border: 1px solid rgba(48, 55, 45, 0.16);
+    display: flex;
+}
+
+.route-item-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.route-title-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.route-title-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.route-title {
+    color: #30372D;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.photo-icon {
+    position: relative;
+    top: 1px;
+}
+
+.route-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.route-action-btn {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.route-description {
+    color: rgba(48, 55, 45, 0.40);
+    font-size: 10px;
+    line-height: 1.2;
+    max-height: 24px; /* ~ 2 строки */
+    overflow: hidden;
+}
+
+.route-points-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    cursor: pointer;
+    color: #30372D;
+    font-size: 10px;
+}
+
+.route-points-wrapper svg.active {
+    transform: rotate(180deg);
+}
+
+.route-points-list {
+    display: none;
+}
+
+.route-points-list.visible {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(48, 55, 45, 0.1);
+    margin-top: 8px;
+    max-height: 130px; /* Примерная высота для 5 элементов */
+    overflow-y: auto;
+    padding-right: 10px; /* Место для кастомного скроллбара */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE */
+}
+.route-points-list.visible::-webkit-scrollbar {
+    display: none; /* Chrome, Safari */
+}
+
+.route-points-list .route-point {
+    cursor: default;
+}
+
+.route-points-list .route-point:hover {
+    background-color: transparent;
+}
+
+
+/* --- Элемент точки в списке (общий) --- */
+.route-point {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    padding: 2px 0;
+}
+.route-point:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+.route-point[draggable="true"] {
+    cursor: move;
+}
+
+.route-point.dragging {
+    opacity: 0.5;
+    background: #e0e0e0;
+}
+.route-point.drag-over-top { border-top: 2px solid #536C45; }
+.route-point.drag-over-bottom { border-bottom: 2px solid #536C45; }
+
+
+.route-point-icon {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2px;
+    align-content: center;
+    justify-content: center;
+    margin-right: -4px;
+}
+
+.route-point-icon .dot {
+    width: 2px;
+    height: 2px;
+    background: #ABABA6;
+    border-radius: 50%;
+}
+
+.route-point-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-grow: 1;
+    justify-content: space-between;
+}
+
+.route-point-name {
+    color: #30372D;
+    font-size: 10px;
+    font-weight: 400;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+/* --- Формы создания/редактирования --- */
+.form-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-header .routes-title {
+    font-size: 24px;
+}
+
+.route-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.form-container input[type="text"],
+.form-container textarea {
+    width: 100%;
+    padding: 12px;
+    background: #FDF9F6;
+    border-radius: 6px;
+    border: 1px solid rgba(48, 55, 45, 0.16);
+    font-size: 12px;
+    color: #30372D;
+    outline: none;
+}
+.form-container input[type="text"]::placeholder,
+.form-container textarea::placeholder {
+    color: rgba(48, 55, 45, 0.40);
+}
+
+
+.form-container textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.form-coords-inputs {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+}
+.form-coords-inputs > div {
+    flex: 1;
+}
+
+.form-upload-btn {
+    width: 100%;
+    background-color: #C9DCBF;
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    color: #30372D;
+    font-size: 10px;
+}
+.form-upload-btn:hover {
+    background-color: #B0C9A6;
+}
+
+.add-route-point-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    background: #C9DCBF;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 10px;
+    color: #30372D;
+}
+.add-route-point-btn:hover {
+    background-color: #B0C9A6;
+}
+
+.route-point-images-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+.route-point-images-inline .image-container {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.route-point-images-inline img {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    outline: 1px solid #FDF9F6;
+    outline-offset: -0.50px;
+    margin-right: -6px;
+    object-fit: cover;
+}
+.route-point-images-inline .image-count {
+    color: #30372D;
+    font-size: 8px;
+    font-weight: 400;
+    white-space: nowrap;
+    position: relative;
+    left: 6px;
+    flex-shrink: 0;
+}
+
+/* --- Карта --- */
+.map-container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 552px;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Кастомный скроллбар --- */
+.custom-scrollbar-container {
+    position: absolute;
+    width: 4px;
+    height: calc(100vh - 140px);
+    background: #EDF2EA;
+    border-radius: 5.40px;
+    right: 16px;
+    top: 70px;
+    z-index: 10;
+}
+
+.custom-scrollbar-thumb {
+    width: 4px;
+    background: #C9DCBF;
+    border-radius: 5.40px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: grab;
+}
+.custom-scrollbar-thumb:active {
+    cursor: grabbing;
+}
+
+/* --- Всплывающая подсказка (Tooltip) --- */
+.point-hover-tooltip {
+    position: fixed;
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    padding: 16px;
+    width: 280px;
+    z-index: 1000;
+    border: 1px solid #C9DCBF;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.point-hover-tooltip-title { color: #30372D; font-size: 18px; font-weight: 700; margin-bottom: 8px; max-height: 48px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 80px; line-height: 1.2; }
+.point-hover-tooltip-description { color: rgba(48, 55, 45, 0.60); font-size: 12px; margin-bottom: 8px; max-height: 30px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 80px; line-height: 1.2; }
+.point-hover-tooltip-coords { display: flex; gap: 16px; margin-top: 12px; padding-right: 80px; }
+.point-hover-tooltip-coords-item { display: flex; gap: 4px; align-items: center; }
+.point-hover-tooltip-coords-label { color: rgba(48, 55, 45, 0.40); font-size: 10px; }
+.point-hover-tooltip-coords-value { color: #30372D; font-size: 10px; }
+.point-hover-tooltip-images-stack { position: absolute; top: 16px; right: 16px; width: 64px; height: 140px; overflow: hidden; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.point-hover-tooltip-images-stack img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; outline: 1px solid #FDF9F6; outline-offset: -1px; flex-shrink: 0; }
+.point-hover-tooltip-images-stack .more-images-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 64px; background: rgba(48, 55, 45, 0.1); border-radius: 6px; display: flex; justify-content: center; align-items: center; color: #30372D; font-size: 10px; box-sizing: border-box; outline: 1px solid #FDF9F6; outline-offset: -1px; text-align: center; line-height: 1; }
+
+/* Стили для текстовой кнопки "Добавить точку" */
+.add-route-point-btn-text {
+    width: auto;
+    padding: 8px 10px;
+    background: #C9DCBF;
+    border-radius: 4px;
+    color: #30372D;
+    font-size: 10px;
+    border: none;
+    cursor: pointer;
+    align-self: flex-end;
+    margin-top: 16px;
+    transition: background-color 0.3s ease;
+}
+.add-route-point-btn-text:hover {
+    background-color: #B0C9A6;
+}
+
+/* Стили для новой секции "Точки" */
+.points-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+.points-section-header h3 {
+    color: #30372D;
+    font-size: 24px;
+    font-weight: 400;
+}
+
+.points-section-add-btn {
+    width: 28px;
+    height: 28px;
+    background: #536C45;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.points-section {
+    max-height: 380px; /* Примерная высота для 4 элементов */
+    overflow-y: auto;
+    padding-right: 10px; /* Место для кастомного скроллбара */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.points-section-item {
+    width: 100%;
+    padding: 12px;
+    background: #FDF9F6;
+    border-radius: 6px;
+    border: 1px solid rgba(48, 55, 45, 0.16);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+}
+
+.point-details-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-grow: 1;
+    max-width: calc(100% - 80px);
+}
+
+.point-details-title {
+    color: #30372D;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.point-details-description {
+    color: rgba(48, 55, 45, 0.40);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.point-details-coords {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+}
+.coord-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.coord-item span:first-child {
+    color: rgba(48, 55, 45, 0.40);
+    font-size: 8px;
+}
+.coord-item span:last-child {
+    color: #30372D;
+    font-size: 8px;
+}
+
+.point-details-images {
+    display: grid;
+    grid-template-columns: repeat(2, 32px);
+    grid-template-rows: repeat(2, 32px);
+    gap: 2px;
+    width: 66px;
+    flex-shrink: 0;
+    margin-left: 12px;
+    position: relative;
+}
+
+.point-details-images img {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    outline: 2px #FDF9F6 solid;
+    outline-offset: -1px
+}
+
+.point-details-images .more-images-overlay {
+    width: 32px;
+    height: 32px;
+    background-color: rgba(48, 55, 45, 0.1);
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #30372D;
+    font-size: 8px;
+    font-weight: 400;
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+}
+
+/* Стили для сетки фотографий в форме создания точки */
+
+.point-images-grid-preview {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+    width: 100%;
+}
+
+.point-image-grid-item {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}
+
+.point-image-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Раскладка для 1 фотографии */
+.point-images-grid-preview.count-1 {
+    grid-template-columns: 1fr;
+}
+
+/* Раскладка для 2 фотографий */
+.point-images-grid-preview.count-2 {
+    grid-template-columns: 1fr 1fr;
+}
+.point-images-grid-preview.count-2 .point-image-grid-item {
+    aspect-ratio: 1 / 1;
+}
+
+/* Раскладка для 3 фотографий */
+.point-images-grid-preview.count-3 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+}
+.point-images-grid-preview.count-3 .point-image-grid-item:nth-child(1) {
+    grid-column: 1 / 3;
+}
+
+/* Раскладка для 4 фотографий */
+.point-images-grid-preview.count-4 {
+    grid-template-columns: 2fr 1.5fr;
+    grid-template-rows: auto auto;
+}
+.point-images-grid-preview.count-4 .point-image-grid-item:nth-child(1) {
+    grid-area: 1 / 1 / 2 / 2;
+}
+.point-images-grid-preview.count-4 .point-image-grid-item:nth-child(2) {
+    grid-area: 1 / 2 / 3 / 3;
+}
+.point-images-grid-preview.count-4 .point-image-grid-item:nth-child(3) {
+    grid-area: 2 / 1 / 3 / 2;
+}
+.point-images-grid-preview.count-4 .point-image-grid-item:nth-child(4) {
+    grid-area: 3 / 1 / 4 / 3;
+}
+
+.more-images-overlay-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(48, 55, 45, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 24px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+.point-image-grid-item .delete-image-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(48, 55, 45, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 2;
+}
+.list-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+}
+.points-counter-bottom {
+    color: #30372D;
+    font-size: 10px;
+}
+.scrollable-list-container {
+    position: relative;
+    display: flex; /* Added for scrollbar alignment */
+    flex-grow: 1; /* Allows this container to take up space */
+    min-height: 0; /* Important for flex children */
+    flex-direction: column;
+}
+.points-section::-webkit-scrollbar {
+    display: none;
+}
+.custom-scrollbar-track {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: #EDF2EA;
+    border-radius: 5.40px;
+}
+.custom-scrollbar-thumb-dynamic {
+    width: 4px;
+    background: #C9DCBF;
+    border-radius: 5.40px;
+    position: absolute;
+    left: 0;
+    cursor: grab;
+}
+.custom-scrollbar-thumb-dynamic:active {
+    cursor: grabbing;
+}
+.routes-container > .add-route-point-btn-text {
+    margin-top: auto;
+}
+/* Стили для кастомной подсказки на карте */
+.custom-placemark-hint {
+    display: flex; gap: 16px; background: #FFFFFF; border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); padding: 16px;
+    width: 280px; border: 1px solid #C9DCBF; box-sizing: border-box;
+}
+.hint-content {
+    display: flex; flex-direction: column; flex-grow: 1;
+    max-width: calc(100% - 80px);
+}
+.hint-title {
+    color: #30372D; font-size: 18px; font-weight: 700; line-height: 1.2;
+    margin-bottom: 8px; max-height: 44px; overflow: hidden;
+    text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.hint-description {
+    color: rgba(48, 55, 45, 0.60); font-size: 12px; line-height: 1.2;
+    margin-bottom: 8px; max-height: 30px; overflow: hidden;
+    text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.hint-coords { display: flex; gap: 16px; margin-top: auto; }
+.hint-coords-item { display: flex; gap: 4px; align-items: center; }
+.hint-coords-item span:first-child { color: rgba(48, 55, 45, 0.40); font-size: 10px; }
+.hint-coords-item span:last-child { color: #30372D; font-size: 10px; }
+.hint-images-stack {
+    width: 64px; height: 140px; overflow: hidden;
+    position: relative; flex-shrink: 0;
+}
+.hint-images-stack img {
+    display: block; width: 64px; height: 64px; border-radius: 6px;
+    object-fit: cover; outline: 2px solid #FFFFFF; position: absolute; left: 0;
+}
+.hint-images-stack img:nth-child(1) { top: 0; z-index: 3; }
+.hint-images-stack img:nth-child(2) { top: 40px; z-index: 2; }
+.hint-images-stack img:nth-child(3) { top: 80px; z-index: 1; }
+
+/* Дополнительные стили для индикатора ожидания координат */
+
+.add-route-point-btn-text.waiting {
+    background-color: #F0A500;
+    color: #FFFFFF;
+    animation: pulse 2s infinite;
+    cursor: wait;
+}
+
+.add-route-point-btn-text.waiting:hover {
+    background-color: #E8940F;
+}
+
+.points-section-add-btn.waiting {
+    background: #F0A500;
+    cursor: wait;
+    animation: pulse 2s infinite;
+}
+
+.points-section-add-btn.waiting:hover {
+    background: #E8940F;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+    100% {
+        opacity: 1;
+    }
+}
