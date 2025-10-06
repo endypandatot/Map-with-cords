@@ -1,6 +1,6 @@
-// src/components/PointsSectionItem.js
+
 import React from 'react';
-import { API_BASE_URL } from '../api'; // <-- 1. Импортируем базовый URL
+import { API_BASE_URL } from '../api';
 
 const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
 
@@ -8,7 +8,7 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
         onEditPoint(point, index);
     };
 
-    // --- 2. Добавляем универсальный обработчик изображений ---
+    // --- Добавляем универсальный обработчик изображений ---
     const processedImages = (point.images || []).map(img => {
         if (typeof img === 'string') {
             return img;
@@ -43,7 +43,7 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
                     </div>
                 </div>
             </div>
-            {/* --- 3. Используем обработанные изображения --- */}
+            {/* --- Используем обработанные изображения --- */}
             {processedImages.length > 0 && (
                 <div className="point-details-images">
                     {visibleImages.map((src, idx) => (

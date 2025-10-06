@@ -1,4 +1,3 @@
-// src/components/SvgIcons/PointDeleteIcon.js
 import React from 'react';
 
 const PointDeleteIcon = ({ className = '', onClick }) => (

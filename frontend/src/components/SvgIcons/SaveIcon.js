@@ -1,4 +1,3 @@
-// src/components/SvgIcons/SaveIcon.js
 import React from 'react';
 
 const SaveIcon = ({ className = '', onClick, disabled = false, fillColor = '#536C45' }) => (

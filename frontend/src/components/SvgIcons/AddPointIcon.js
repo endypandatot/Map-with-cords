@@ -1,4 +1,3 @@
-// src/components/SvgIcons/AddPointIcon.js
 import React from 'react';
 
 const AddPointIcon = ({ className = '', onClick }) => (

@@ -1,4 +1,3 @@
-# map/models.py
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 import os
@@ -26,8 +25,6 @@ class Point(models.Model):
     lat = models.DecimalField(max_digits=18, decimal_places=15, validators=[MinValueValidator(-90.0), MaxValueValidator(90.0)])
     lon = models.DecimalField(max_digits=18, decimal_places=15, validators=[MinValueValidator(-180.0), MaxValueValidator(180.0)])
     order = models.IntegerField(default=0)
-    # --- ИЗМЕНЕНИЕ ---
-    # Убираем старые поля 'image' и 'images', они больше не нужны.
 
     class Meta:
         ordering = ['order']
@@ -35,7 +32,6 @@ class Point(models.Model):
     def __str__(self):
         return self.name or f"Point {self.id}"
 
-# --- НОВАЯ МОДЕЛЬ ---
 class PointImage(models.Model):
     """
     Модель для хранения одного изображения, связанного с точкой.

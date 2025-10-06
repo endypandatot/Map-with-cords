@@ -1,4 +1,3 @@
-// src/components/SvgIcons/ArrowDownIcon.js
 import React from 'react';
 
 const ArrowDownIcon = ({ className = '' }) => (

@@ -1,15 +1,15 @@
 import React, { useRef, useEffect, useContext, useCallback } from 'react';
 import { RouteContext } from '../App';
 
-const YANDEX_MAPS_API_KEY = '52c2e7b2-2008-4f6a-b445-d50dd722b668'; // Ваш API-ключ
+const YANDEX_MAPS_API_KEY = '52c2e7b2-2008-4f6a-b445-d50dd722b668';
 
 const MapComponent = () => {
   const mapRef = useRef(null);
-  const ymapsRef = useRef(null); // Для хранения объекта ymaps
-  const myMapRef = useRef(null); // Для хранения экземпляра карты
-  const routePlacemarksCollectionRef = useRef(null); // Коллекция для меток маршрута
-  const routePolylineRef = useRef(null); // Линия маршрута
-  const currentPlacemarkRef = useRef(null); // Временная красная метка
+  const ymapsRef = useRef(null);
+  const myMapRef = useRef(null);
+  const routePlacemarksCollectionRef = useRef(null);
+  const routePolylineRef = useRef(null);
+  const currentPlacemarkRef = useRef(null);
 
   const {
     currentRoute,

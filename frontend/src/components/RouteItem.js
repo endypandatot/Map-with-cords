@@ -1,4 +1,3 @@
-// src/components/RouteItem.js
 import React, { useState, useContext, useCallback } from 'react';
 import { RouteContext } from '../App';
 import DeleteIcon from './SvgIcons/DeleteIcon';
@@ -11,16 +10,14 @@ const RouteListPointItem = React.memo(({ point, index }) => {
 
     // Обработка изображений
     const processedImages = (point.images || []).map(img => {
-        // Если 'img' - это уже готовая строка (data:image или http://...), используем её как есть.
         if (typeof img === 'string') {
             return img;
         }
-        // Если 'img' - это объект от сервера { image: '/path/...' }, строим полный URL.
         if (typeof img === 'object' && img !== null && img.image) {
             return `${API_BASE_URL}${img.image}`;
         }
         return null;
-    }).filter(Boolean); // Убираем все некорректные значения
+    }).filter(Boolean);
 
     const visibleImages = processedImages.slice(0, 3);
     const remainingImagesCount = processedImages.length - visibleImages.length;
@@ -50,11 +47,10 @@ const RouteListPointItem = React.memo(({ point, index }) => {
     );
 });
 
-const RouteItem = ({ routeData }) => {
+const RouteItem = ({ routeData, onHoverStart, onHoverEnd }) => {
     const { startEditRoute, handleDeleteRoute, startViewRoute } = useContext(RouteContext);
     const [pointsListVisible, setPointsListVisible] = useState(false);
 
-    // ИСПРАВЛЕНИЕ: добавлена зависимость routeData в useCallback
     const handleSelectRoute = useCallback(() => {
         console.log('🎯 Route selected for viewing:', routeData);
         startViewRoute(routeData.id);
@@ -75,10 +71,26 @@ const RouteItem = ({ routeData }) => {
         setPointsListVisible(prev => !prev);
     }, []);
 
+    const handleMouseEnter = useCallback(() => {
+        if (onHoverStart) {
+            onHoverStart(routeData.id);
+        }
+    }, [onHoverStart, routeData.id]);
+
+    const handleMouseLeave = useCallback(() => {
+        if (onHoverEnd) {
+            onHoverEnd();
+        }
+    }, [onHoverEnd]);
+
     const hasPhotos = routeData.points.some(p => p.images && p.images.length > 0);
 
     return (
-        <div className="route-item">
+        <div
+            className="route-item"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
             <div className="route-item-content">
                 <div className="route-title-wrapper">
                     <div className="route-title-container" onClick={handleSelectRoute}>
@@ -92,7 +104,7 @@ const RouteItem = ({ routeData }) => {
                 </div>
                 <div className="route-description">{routeData.description || 'Без описания'}</div>
                 <div className="route-points-wrapper" onClick={togglePointsList}>
-                    <span>{routeData.points.length} точек</span>
+                    <span>{routeData.points.length} точки</span>
                     <ArrowDownIcon className={pointsListVisible ? 'active' : ''} />
                 </div>
                 <div className={`route-points-list ${pointsListVisible ? 'visible' : ''}`}>

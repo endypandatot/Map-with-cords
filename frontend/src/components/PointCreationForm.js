@@ -1,7 +1,7 @@
-// src/components/PointCreationForm.js
 import React, { useState, useEffect, useCallback } from 'react';
 import SaveIcon from './SvgIcons/SaveIcon';
 import CancelIcon from './SvgIcons/CancelIcon';
+import { LIMITS, LIMIT_MESSAGES, checkLimits, formatters } from '../constants/limits';
 
 const parseDecimalCoordinate = (value) => {
     if (typeof value !== 'string' || value.trim() === '') return '';
@@ -57,7 +57,6 @@ const validateCoordinates = (lat, lon) => {
     return { valid: true, message: '' };
 };
 
-// НОВАЯ ФУНКЦИЯ: проверка файла по сигнатуре (magic bytes)
 const checkFileSignature = (file) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -88,7 +87,7 @@ const checkFileSignature = (file) => {
                 tiffBE: [0x4D, 0x4D, 0x00, 0x2A],
                 // ICO: 00 00 01 00
                 ico: [0x00, 0x00, 0x01, 0x00],
-                // SVG: начинается с XML или <!DOCTYPE или <svg
+                // SVG: начинается с XML или !DOCTYPE или <svg
                 svg1: [0x3C, 0x3F, 0x78, 0x6D, 0x6C], // <?xml
                 svg2: [0x3C, 0x73, 0x76, 0x67], // <svg
                 svg3: [0x3C, 0x21, 0x44, 0x4F, 0x43, 0x54, 0x59, 0x50, 0x45], // <!DOCTYPE
@@ -178,9 +177,6 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
     const [existingImages, setExistingImages] = useState([]);
     const [newImages, setNewImages] = useState([]);
 
-    const MAX_IMAGES = 4;
-    const MAX_FILE_SIZE = 30 * 1024 * 1024;
-
     useEffect(() => {
         const latDec = initialPoint?.lat ? String(initialPoint.lat) : (tempCoords?.[0] ? String(tempCoords[0]) : '');
         const lonDec = initialPoint?.lon ? String(initialPoint.lon) : (tempCoords?.[1] ? String(tempCoords[1]) : '');
@@ -268,12 +264,28 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
         }
     };
 
-    // ОБНОВЛЕННЫЙ ОБРАБОТЧИК: с проверкой сигнатуры файлов
+    // ОБНОВЛЕННЫЙ ОБРАБОТЧИК с проверкой лимитов
     const handleImageUpload = useCallback(async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
         setImageError('');
+
+        // ПРОВЕРКА ЛИМИТА НА КОЛИЧЕСТВО ИЗОБРАЖЕНИЙ
+        const currentImagesCount = pointImages.length;
+        if (!checkLimits.canAddImage(currentImagesCount)) {
+            setImageError(LIMIT_MESSAGES.MAX_IMAGES);
+            e.target.value = null;
+            return;
+        }
+
+        const availableSlots = LIMITS.MAX_IMAGES_PER_POINT - currentImagesCount;
+
+        if (files.length > availableSlots) {
+            setImageError(`Можно загрузить еще ${availableSlots} фото (максимум ${LIMITS.MAX_IMAGES_PER_POINT} на точку)`);
+            e.target.value = null;
+            return;
+        }
 
         // Базовая проверка типов файлов
         const invalidFiles = files.filter(file => !isValidImageFile(file));
@@ -284,7 +296,16 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
             return;
         }
 
-        // НОВОЕ: проверка сигнатуры файлов (magic bytes)
+        // ПРОВЕРКА РАЗМЕРА ФАЙЛОВ
+        const oversizedFiles = files.filter(file => !checkLimits.isImageSizeValid(file.size));
+        if (oversizedFiles.length > 0) {
+            const filesInfo = oversizedFiles.map(f => `${f.name} (${formatters.formatFileSize(f.size)})`).join(', ');
+            setImageError(`${LIMIT_MESSAGES.MAX_IMAGE_SIZE}\nФайлы: ${filesInfo}`);
+            e.target.value = null;
+            return;
+        }
+
+        // ПРОВЕРКА СИГНАТУРЫ ФАЙЛОВ (magic bytes)
         try {
             const signatureChecks = await Promise.all(
                 files.map(file => checkFileSignature(file))
@@ -309,29 +330,6 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
             return;
         }
 
-        const currentImagesCount = pointImages.length;
-        const availableSlots = MAX_IMAGES - currentImagesCount;
-
-        if (availableSlots <= 0) {
-            setImageError(`Максимум ${MAX_IMAGES} фотографии на точку`);
-            e.target.value = null;
-            return;
-        }
-
-        if (files.length > availableSlots) {
-            setImageError(`Можно загрузить еще ${availableSlots} фото (максимум ${MAX_IMAGES} на точку)`);
-            e.target.value = null;
-            return;
-        }
-
-        const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
-        if (oversizedFiles.length > 0) {
-            const filesNames = oversizedFiles.map(f => f.name).join(', ');
-            setImageError(`Файлы слишком большие (макс. 30 МБ): ${filesNames}`);
-            e.target.value = null;
-            return;
-        }
-
         // Загрузка файлов
         let loadedCount = 0;
         files.forEach(file => {
@@ -347,13 +345,13 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
                 }
             };
             reader.onerror = () => {
-                setImageError(`Ошибка загрузки файла ${file.name}`);
+                setImageError(`Ошибка загрузки файла: ${file.name}`);
             };
             reader.readAsDataURL(file);
         });
 
         e.target.value = null;
-    }, [pointImages.length, MAX_IMAGES, MAX_FILE_SIZE]);
+    }, [pointImages.length]);
 
     const handleDeleteImage = useCallback((indexToDelete) => {
         const imageToDelete = pointImages[indexToDelete];
@@ -393,7 +391,7 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
 
     const imagesToShow = pointImages.slice(0, 4);
     const remainingCount = pointImages.length - imagesToShow.length;
-    const canUploadMore = pointImages.length < MAX_IMAGES;
+    const canUploadMore = pointImages.length < LIMITS.MAX_IMAGES_PER_POINT;
 
     return (
         <div className="form-container">
@@ -412,12 +410,14 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
                 placeholder="Название точки"
                 value={pointName}
                 onChange={(e) => setPointName(e.target.value)}
+                maxLength={LIMITS.MAX_POINT_NAME_LENGTH}
             />
 
             <textarea
                 placeholder="Краткое описание"
                 value={pointDescription}
                 onChange={(e) => setPointDescription(e.target.value)}
+                maxLength={LIMITS.MAX_POINT_DESCRIPTION_LENGTH}
             />
 
             <div className="form-coords-inputs">
@@ -453,8 +453,8 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
                 }}
             >
                 {canUploadMore
-                    ? `Загрузить фото (${pointImages.length}/${MAX_IMAGES})`
-                    : `Достигнут лимит (${MAX_IMAGES}/${MAX_IMAGES})`
+                    ? `Загрузить фото (${pointImages.length}/${LIMITS.MAX_IMAGES_PER_POINT})`
+                    : `Достигнут лимит (${LIMITS.MAX_IMAGES_PER_POINT}/${LIMITS.MAX_IMAGES_PER_POINT})`
                 }
             </button>
 
@@ -465,7 +465,7 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
                 textAlign: 'center',
                 lineHeight: '1.4'
             }}>
-                Максимум 4 фотографии. Каждая не более 30 МБ.
+                Максимум {LIMITS.MAX_IMAGES_PER_POINT} фотографии. Каждая не более {LIMITS.MAX_IMAGE_SIZE_MB} МБ.
             </div>
 
             {coordsError && (
@@ -488,7 +488,8 @@ function PointCreationForm({ point: initialPoint, tempCoords, onSave, onCancel }
                     marginBottom: '8px',
                     textAlign: 'center',
                     maxWidth: '100%',
-                    wordWrap: 'break-word'
+                    wordWrap: 'break-word',
+                    whiteSpace: 'pre-line'
                 }}>
                     {imageError}
                 </div>

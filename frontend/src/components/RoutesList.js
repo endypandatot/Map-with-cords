@@ -1,9 +1,8 @@
-// src/components/RoutesList.js
 import React, { useContext } from 'react';
 import { RouteContext } from '../App';
 import RouteItem from './RouteItem';
 
-function RoutesList() {
+function RoutesList({ onRouteHoverStart, onRouteHoverEnd }) {
     const { routes } = useContext(RouteContext);
 
     return (
@@ -17,6 +16,8 @@ function RoutesList() {
                     <RouteItem
                         key={route.id}
                         routeData={route}
+                        onHoverStart={onRouteHoverStart}
+                        onHoverEnd={onRouteHoverEnd}
                     />
                 ))
             )}

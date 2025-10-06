@@ -1,4 +1,3 @@
-// src/components/SvgIcons/AddRouteIcon.js
 import React from 'react';
 
 const AddRouteIcon = ({ className = '', onClick }) => (

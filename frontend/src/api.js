@@ -1,4 +1,4 @@
-// src/api.js
+
 import axios from 'axios';
 
 export const API_BASE_URL = 'http://localhost:8000';
@@ -48,11 +48,6 @@ api.interceptors.response.use(
   }
 );
 
-/**
- * Преобразует строку Data URL (Base64) в объект Blob.
- * @param {string} dataurl - Строка в формате "data:image/png;base64,..."
- * @returns {Blob|null} - Объект Blob или null в случае ошибки.
- */
 const dataURLtoBlob = (dataurl) => {
   try {
     const arr = dataurl.split(',');
@@ -89,13 +84,10 @@ export const routeApi = {
     base64Images.forEach((base64String, index) => {
       console.log(`Converting image ${index}:`, base64String.substring(0, 100) + '...');
 
-      // Преобразуем каждую строку Base64 в Blob
       const blob = dataURLtoBlob(base64String);
 
       if (blob) {
         console.log(`Successfully converted image ${index} to blob:`, blob);
-        // Добавляем Blob в formData как файл
-        // Используем правильное имя поля 'images' (множественное число)
         formData.append('images', blob, `image_${index}.png`);
       } else {
         console.error(`Failed to convert image ${index} to blob`);

@@ -1,4 +1,3 @@
-// src/components/CustomScrollbar.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const CustomScrollbar = ({ scrollableRef, listLength, visibilityThreshold }) => {

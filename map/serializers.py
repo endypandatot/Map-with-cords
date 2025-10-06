@@ -1,4 +1,3 @@
-# map/serializers.py
 from rest_framework import serializers
 from django.db import transaction
 from .models import Route, Point, PointImage
@@ -49,7 +48,6 @@ class RouteSerializer(serializers.ModelSerializer):
         instance.save()
 
         if points_data is not None:
-            # ИСПРАВЛЕНИЕ: Сохраняем существующие точки с изображениями
             existing_points_map = {point.id: point for point in instance.points.all()}
             updated_point_ids = []
 

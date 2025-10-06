@@ -1,4 +1,3 @@
-// src/components/SvgIcons/DeleteIcon.js
 import React from 'react';
 
 const DeleteIcon = ({ className = '', onClick }) => (

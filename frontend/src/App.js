@@ -1,7 +1,7 @@
-// src/App.js
 import React, { createContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { routeApi, API_BASE_URL } from './api';
+import { LIMITS, LIMIT_MESSAGES, checkLimits } from './constants/limits';
 import RoutesList from './components/RoutesList';
 import RouteCreationForm from './components/RouteCreationForm';
 import PointCreationForm from './components/PointCreationForm';
@@ -21,12 +21,14 @@ export const UI_MODE = {
 const initialState = {
     routes: [],
     currentRoute: null,
+    previewRoute: null,
     pointToEdit: null,
     tempPointCoords: null,
     uiMode: UI_MODE.MAIN_LIST,
     isLoading: true,
     error: null,
     waitingForCoordinates: false,
+    quickCreateMode: false, // НОВОЕ: флаг быстрого создания с главного экрана
 };
 
 function appReducer(state, action) {
@@ -38,11 +40,14 @@ function appReducer(state, action) {
         case 'SET_CURRENT_ROUTE':
             console.log('🚀 SET_CURRENT_ROUTE called with:', action.payload);
             return { ...state, currentRoute: action.payload };
-        case 'CLEAR_CURRENT_ROUTE': return { ...state, currentRoute: null, pointToEdit: null, tempPointCoords: null };
+        case 'CLEAR_CURRENT_ROUTE': return { ...state, currentRoute: null, pointToEdit: null, tempPointCoords: null, quickCreateMode: false };
+        case 'SET_PREVIEW_ROUTE': return { ...state, previewRoute: action.payload };
+        case 'CLEAR_PREVIEW_ROUTE': return { ...state, previewRoute: null };
         case 'SET_POINT_TO_EDIT': return { ...state, pointToEdit: action.payload };
         case 'CLEAR_POINT_TO_EDIT': return { ...state, pointToEdit: null, tempPointCoords: null, waitingForCoordinates: false };
         case 'SET_TEMP_POINT_COORDS': return { ...state, tempPointCoords: action.payload };
         case 'SET_WAITING_FOR_COORDINATES': return { ...state, waitingForCoordinates: action.payload };
+        case 'SET_QUICK_CREATE_MODE': return { ...state, quickCreateMode: action.payload }; // НОВОЕ
         case 'UPDATE_CURRENT_ROUTE_POINTS':
             if (!state.currentRoute) return state;
             return { ...state, currentRoute: { ...state.currentRoute, points: action.payload } };
@@ -54,7 +59,7 @@ export const RouteContext = createContext();
 
 function App() {
     const [state, dispatch] = useReducer(appReducer, initialState);
-    const { routes, currentRoute, pointToEdit, tempPointCoords, uiMode, waitingForCoordinates } = state;
+    const { routes, currentRoute, previewRoute, pointToEdit, tempPointCoords, uiMode, waitingForCoordinates, quickCreateMode } = state;
     const routesListRef = useRef(null);
 
     useEffect(() => {
@@ -150,7 +155,6 @@ function App() {
                 const response = await routeApi.getRoutes();
                 console.log('📦 Raw API response:', response.data);
 
-                // Обработка пагинированного ответа
                 let routesData;
                 if (response.data.results && Array.isArray(response.data.results)) {
                     console.log('📊 Paginated response detected');
@@ -175,17 +179,24 @@ function App() {
         fetchRoutes();
     }, [processRoutesFromServer]);
 
-
     const showMainList = useCallback(() => {
         dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.MAIN_LIST });
         dispatch({ type: 'CLEAR_CURRENT_ROUTE' });
+        dispatch({ type: 'SET_QUICK_CREATE_MODE', payload: false });
     }, []);
 
     const startCreateRoute = useCallback(() => {
+        // ПРОВЕРКА ЛИМИТА НА КОЛИЧЕСТВО МАРШРУТОВ
+        if (!checkLimits.canCreateRoute(routes.length)) {
+            alert(LIMIT_MESSAGES.MAX_ROUTES);
+            return;
+        }
+
         dispatch({ type: 'SET_CURRENT_ROUTE', payload: { id: `temp_${Date.now()}`, name: '', description: '', points: [] } });
         dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.CREATE_ROUTE });
         dispatch({ type: 'CLEAR_POINT_TO_EDIT' });
-    }, []);
+        dispatch({ type: 'SET_QUICK_CREATE_MODE', payload: false });
+    }, [routes.length]);
 
     const startEditRoute = useCallback((routeId) => {
         const routeToEdit = routes.find(r => r.id === routeId);
@@ -194,6 +205,7 @@ function App() {
             dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.EDIT_ROUTE });
             dispatch({ type: 'SET_CURRENT_ROUTE', payload: JSON.parse(JSON.stringify(routeToEdit)) });
             dispatch({ type: 'CLEAR_POINT_TO_EDIT' });
+            dispatch({ type: 'SET_QUICK_CREATE_MODE', payload: false });
         }
     }, [routes]);
 
@@ -214,32 +226,45 @@ function App() {
             dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.VIEW_ROUTE_DETAILS });
             dispatch({ type: 'SET_CURRENT_ROUTE', payload: JSON.parse(JSON.stringify(routeToView)) });
             dispatch({ type: 'CLEAR_POINT_TO_EDIT' });
+            dispatch({ type: 'SET_QUICK_CREATE_MODE', payload: false });
         }
     }, [routes]);
 
-    // Создание точки с координатами (клик по карте) - для форм создания/редактирования маршрутов
-    const startCreatePoint = useCallback((coords = null) => {
-        if (coords) {
-            dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.CREATE_POINT });
-            dispatch({ type: 'SET_POINT_TO_EDIT', payload: {
-                id: `temp_point_${Date.now()}`,
-                name: '',
-                description: '',
-                lat: coords[0],
-                lon: coords[1],
-                images: []
-            } });
-            dispatch({ type: 'SET_TEMP_POINT_COORDS', payload: coords });
-            dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: false });
-        } else {
-            console.log('Waiting for coordinates from map click...');
-            dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: true });
+    const handleRouteHoverStart = useCallback((routeId) => {
+        if (uiMode !== UI_MODE.MAIN_LIST) return;
+
+        const routeToPreview = routes.find(r => r.id === routeId);
+        if (routeToPreview) {
+            console.log('👁️ Preview route:', routeToPreview.name);
+            dispatch({ type: 'SET_PREVIEW_ROUTE', payload: routeToPreview });
         }
+    }, [routes, uiMode]);
+
+    const handleRouteHoverEnd = useCallback(() => {
+        dispatch({ type: 'CLEAR_PREVIEW_ROUTE' });
     }, []);
 
-    // НОВОЕ: создание точки с ручным вводом координат (для кнопки на главном экране)
+    const startCreatePointWithMapClick = useCallback(() => {
+        // ПРОВЕРКА ЛИМИТА НА КОЛИЧЕСТВО ТОЧЕК
+        const currentPointsCount = currentRoute?.points?.length || 0;
+        if (!checkLimits.canAddPoint(currentPointsCount)) {
+            alert(LIMIT_MESSAGES.MAX_POINTS);
+            return;
+        }
+
+        console.log('Activating map click mode for point creation...');
+        dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: true });
+    }, [currentRoute]);
+
     const startCreatePointManual = useCallback(() => {
-        console.log('Starting manual point creation (from main list)');
+        // ПРОВЕРКА ЛИМИТА НА КОЛИЧЕСТВО ТОЧЕК
+        const currentPointsCount = currentRoute?.points?.length || 0;
+        if (!checkLimits.canAddPoint(currentPointsCount)) {
+            alert(LIMIT_MESSAGES.MAX_POINTS);
+            return;
+        }
+
+        console.log('Starting manual point creation (empty form)');
         dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.CREATE_POINT });
         dispatch({ type: 'SET_POINT_TO_EDIT', payload: {
             id: `temp_point_${Date.now()}`,
@@ -248,10 +273,10 @@ function App() {
             lat: '',
             lon: '',
             images: [],
-            manualInput: true // Флаг для ручного ввода
+            manualInput: true
         } });
         dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: false });
-    }, []);
+    }, [currentRoute]);
 
     const startEditPoint = useCallback((pointData, pointIndex) => {
         console.log('Starting edit point:', pointData);
@@ -261,6 +286,18 @@ function App() {
 
     const handleSaveRoute = useCallback(async (routeData) => {
         console.log('Saving route data:', routeData);
+
+        // ВАЛИДАЦИЯ ПЕРЕД СОХРАНЕНИЕМ
+        if (!checkLimits.isTextLengthValid(routeData.name, LIMITS.MAX_ROUTE_NAME_LENGTH)) {
+            alert(LIMIT_MESSAGES.MAX_ROUTE_NAME);
+            return;
+        }
+
+        if (!checkLimits.isTextLengthValid(routeData.description, LIMITS.MAX_ROUTE_DESCRIPTION_LENGTH)) {
+            alert(LIMIT_MESSAGES.MAX_ROUTE_DESCRIPTION);
+            return;
+        }
+
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const imagesToUploadByPoint = [];
@@ -335,15 +372,30 @@ function App() {
 
     const handleSavePoint = useCallback((pointData, pointIndex = null) => {
         console.log('Saving point data:', pointData);
+
+        // ВАЛИДАЦИЯ ТОЧКИ ПЕРЕД СОХРАНЕНИЕМ
+        if (!checkLimits.isTextLengthValid(pointData.name, LIMITS.MAX_POINT_NAME_LENGTH)) {
+            alert(LIMIT_MESSAGES.MAX_POINT_NAME);
+            return;
+        }
+
+        if (!checkLimits.isTextLengthValid(pointData.description, LIMITS.MAX_POINT_DESCRIPTION_LENGTH)) {
+            alert(LIMIT_MESSAGES.MAX_POINT_DESCRIPTION);
+            return;
+        }
+
         let targetRoute = currentRoute;
         let uiModeAfterSave = UI_MODE.EDIT_ROUTE;
+
         if (!targetRoute) {
             targetRoute = { id: `temp_${Date.now()}`, name: '', description: '', points: [] };
             uiModeAfterSave = UI_MODE.CREATE_ROUTE;
         }
+
         const updatedPoints = (pointIndex !== null && typeof targetRoute.points[pointIndex] !== 'undefined')
             ? targetRoute.points.map((p, idx) => idx === pointIndex ? { ...p, ...pointData } : p)
             : [...targetRoute.points, { ...pointData, id: `temp_point_${Date.now()}` }];
+
         console.log('Updated points:', updatedPoints);
         dispatch({ type: 'SET_CURRENT_ROUTE', payload: { ...targetRoute, points: updatedPoints } });
         dispatch({ type: 'SET_UI_MODE', payload: uiModeAfterSave });
@@ -358,6 +410,14 @@ function App() {
 
     const handleCancelPointForm = useCallback(() => {
         dispatch({ type: 'CLEAR_POINT_TO_EDIT' });
+
+        // НОВОЕ: если это режим быстрого создания и точка не была сохранена
+        if (quickCreateMode && (!currentRoute?.points || currentRoute.points.length === 0)) {
+            console.log('🔙 Canceling quick create, returning to main list');
+            showMainList();
+            return;
+        }
+
         if (currentRoute && typeof currentRoute.id === 'number') {
             dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.EDIT_ROUTE });
         } else if (currentRoute) {
@@ -365,12 +425,55 @@ function App() {
         } else {
             showMainList();
         }
-    }, [currentRoute, showMainList]);
+    }, [currentRoute, quickCreateMode, showMainList]);
 
     const handleMapClickForPointCreation = useCallback((coords) => {
-        console.log('Map clicked with coords:', coords, 'UI mode:', uiMode, 'Waiting for coordinates:', waitingForCoordinates);
+        console.log('🗺️ Map clicked with coords:', coords, 'UI mode:', uiMode, 'Waiting for coordinates:', waitingForCoordinates);
+
+        if (uiMode === UI_MODE.MAIN_LIST && !waitingForCoordinates) {
+            console.log('⚡ Quick create mode from main list');
+
+            // Проверяем лимит маршрутов
+            if (!checkLimits.canCreateRoute(routes.length)) {
+                alert(LIMIT_MESSAGES.MAX_ROUTES);
+                return;
+            }
+
+            // Создаем новый временный маршрут
+            const newRoute = {
+                id: `temp_${Date.now()}`,
+                name: '',
+                description: '',
+                points: []
+            };
+
+            dispatch({ type: 'SET_CURRENT_ROUTE', payload: newRoute });
+            dispatch({ type: 'SET_QUICK_CREATE_MODE', payload: true }); // Устанавливаем флаг быстрого создания
+
+            // Создаем точку с координатами
+            dispatch({ type: 'SET_POINT_TO_EDIT', payload: {
+                id: `temp_point_${Date.now()}`,
+                name: '',
+                description: '',
+                lat: coords[0],
+                lon: coords[1],
+                images: []
+            }});
+            dispatch({ type: 'SET_TEMP_POINT_COORDS', payload: coords });
+            dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.CREATE_POINT });
+            return;
+        }
+
         if (waitingForCoordinates) {
-            console.log('Creating point with coordinates from map click');
+            // ПРОВЕРКА ЛИМИТА ПЕРЕД СОЗДАНИЕМ ТОЧКИ
+            const currentPointsCount = currentRoute?.points?.length || 0;
+            if (currentRoute && !checkLimits.canAddPoint(currentPointsCount)) {
+                alert(LIMIT_MESSAGES.MAX_POINTS);
+                dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: false });
+                return;
+            }
+
+            console.log('✅ Creating point with coordinates from map click (standard flow)');
             dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.CREATE_POINT });
             dispatch({ type: 'SET_POINT_TO_EDIT', payload: {
                 id: `temp_point_${Date.now()}`,
@@ -379,13 +482,11 @@ function App() {
                 lat: coords[0],
                 lon: coords[1],
                 images: []
-            } });
+            }});
             dispatch({ type: 'SET_TEMP_POINT_COORDS', payload: coords });
             dispatch({ type: 'SET_WAITING_FOR_COORDINATES', payload: false });
-        } else if ([UI_MODE.MAIN_LIST, UI_MODE.CREATE_ROUTE, UI_MODE.EDIT_ROUTE].includes(uiMode)) {
-            startCreatePoint(coords);
         }
-    }, [uiMode, waitingForCoordinates, startCreatePoint]);
+    }, [uiMode, waitingForCoordinates, currentRoute, routes.length]);
 
     const handleDragEndPoints = useCallback((newOrderedPoints) => {
         dispatch({ type: 'UPDATE_CURRENT_ROUTE_POINTS', payload: newOrderedPoints });
@@ -402,7 +503,10 @@ function App() {
                         </div>
                         <div className="main-list-container">
                             <div className="routes-list" ref={routesListRef}>
-                                <RoutesList />
+                                <RoutesList
+                                    onRouteHoverStart={handleRouteHoverStart}
+                                    onRouteHoverEnd={handleRouteHoverEnd}
+                                />
                             </div>
                             <CustomScrollbar
                                 scrollableRef={routesListRef}
@@ -410,10 +514,6 @@ function App() {
                                 visibilityThreshold={5}
                             />
                         </div>
-                        {/* ИЗМЕНЕНО: вызываем startCreatePointManual вместо startCreatePoint */}
-                        <button className="add-route-point-btn-text" onClick={startCreatePointManual}>
-                            Добавить точку
-                        </button>
                     </>
                 );
             case UI_MODE.CREATE_ROUTE:
@@ -424,7 +524,8 @@ function App() {
                         route={currentRoute}
                         onSave={handleSaveRoute}
                         onCancel={showMainList}
-                        onAddPoint={startCreatePoint}
+                        onAddPointWithMapClick={startCreatePointWithMapClick}
+                        onAddPointManual={startCreatePointManual}
                         onEditPoint={startEditPoint}
                         onDeletePoint={handleDeletePoint}
                         onDragEndPoints={handleDragEndPoints}
@@ -465,6 +566,7 @@ function App() {
                     <div className="map-container">
                         <YandexMap
                             currentRoute={currentRoute}
+                            previewRoute={previewRoute}
                             tempPointCoords={tempPointCoords}
                             uiMode={uiMode}
                             onMapClick={handleMapClickForPointCreation}

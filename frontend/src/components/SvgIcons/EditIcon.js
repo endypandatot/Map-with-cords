@@ -1,4 +1,3 @@
-// src/components/SvgIcons/EditIcon.js
 import React from 'react';
 
 const EditIcon = ({ className = '', onClick }) => (

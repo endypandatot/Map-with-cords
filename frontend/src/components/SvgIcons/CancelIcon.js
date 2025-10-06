@@ -1,4 +1,3 @@
-// src/components/SvgIcons/CancelIcon.js
 import React from 'react';
 
 const CancelIcon = ({ className = '', onClick }) => (
