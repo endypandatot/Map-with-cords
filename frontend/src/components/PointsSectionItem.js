@@ -1,4 +1,4 @@
-
+// src/components/PointsSectionItem.js
 import React from 'react';
 import { API_BASE_URL } from '../api';
 
@@ -8,19 +8,14 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
         onEditPoint(point, index);
     };
 
-    // --- Добавляем универсальный обработчик изображений ---
+    // Обработка изображений
     const processedImages = (point.images || []).map(img => {
-        if (typeof img === 'string') {
-            return img;
-        }
+        if (typeof img === 'string') return img;
         if (typeof img === 'object' && img !== null && img.image) {
             return `${API_BASE_URL}${img.image}`;
         }
         return null;
     }).filter(Boolean);
-
-    const visibleImages = processedImages.slice(0, 3);
-    const remainingImagesCount = processedImages.length - visibleImages.length;
 
     const formatCoord = (coord) => {
         const num = parseFloat(coord);
@@ -43,15 +38,14 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
                     </div>
                 </div>
             </div>
-            {/* --- Используем обработанные изображения --- */}
             {processedImages.length > 0 && (
                 <div className="point-details-images">
-                    {visibleImages.map((src, idx) => (
+                    {processedImages.slice(0, 3).map((src, idx) => (
                         <img key={idx} src={src} alt="" />
                     ))}
-                    {processedImages.length > 3 && (
+                    {processedImages.length === 4 && (
                         <div className="more-images-overlay">
-                            +{remainingImagesCount}
+                            +1
                         </div>
                     )}
                 </div>

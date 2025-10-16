@@ -1,37 +1,28 @@
+// src/components/YandexMap.js
 import React, { useEffect, useRef, useState } from 'react';
-import { UI_MODE } from '../App';
-
-console.log('🗺️ YandexMap.js loaded!');
-
-const decimalToDMS = (dec) => {
-    if (isNaN(dec) || dec === '' || dec === null) return '';
-    const absolute = Math.abs(dec);
-    const degrees = Math.floor(absolute);
-    const minutesNotTruncated = (absolute - degrees) * 60;
-    const minutes = Math.floor(minutesNotTruncated);
-    const seconds = Math.floor((minutesNotTruncated - minutes) * 60);
-    return `${degrees}°${minutes}'${seconds}"`;
-};
+import { UI_MODE } from '../constants/uiModes';
+import { decimalToDMS } from '../utils/formatters';
+import { isValidImageURL } from '../utils/imageHelpers';
 
 const createSafePlacemarkHintLayout = (ymaps) => {
     try {
         return ymaps.templateLayoutFactory.createClass(
             '<div class="figma-hint">' +
                 '<div class="figma-hint-main">' +
-                    '<div class="figma-hint-title">{{ properties.safeData.name }}</div>' +
-                    '<div class="figma-hint-description">{{ properties.safeData.description }}</div>' +
+                    '<div class="figma-hint-title">$[properties.safeData.name]</div>' +
+                    '<div class="figma-hint-description">$[properties.safeData.description]</div>' +
                     '<div class="figma-hint-coordinates">' +
                         '<div class="figma-coord-item">' +
                             '<span class="figma-coord-label">Широта</span>' +
-                            '<span class="figma-coord-value">{{ properties.safeData.lat }}</span>' +
+                            '<span class="figma-coord-value">$[properties.safeData.lat]</span>' +
                         '</div>' +
                         '<div class="figma-coord-item">' +
                             '<span class="figma-coord-label">Долгота</span>' +
-                            '<span class="figma-coord-value">{{ properties.safeData.lon }}</span>' +
+                            '<span class="figma-coord-value">$[properties.safeData.lon]</span>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
-                '{{ properties.safeData.imagesHtml|raw }}' +
+                '<div id="hint-images-container"></div>' +
             '</div>',
             {
                 build: function () {
@@ -40,13 +31,15 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             this.constructor.superclass.build.call(this);
                         }
                         this.injectStyles();
+
                         const data = this.getData();
-                        console.log('🎨 Building safe Figma hint:', {
-                            name: data.safeData?.name,
-                            hasImages: !!data.safeData?.imagesHtml
-                        });
+                        const imagesContainer = this.getElement().querySelector('#hint-images-container');
+
+                        if (imagesContainer && data.safeData && data.safeData.images) {
+                            this.renderImages(imagesContainer, data.safeData.images);
+                        }
                     } catch (error) {
-                        console.error('🎨 Error in hint build:', error);
+                        console.error('Error in hint build:', error);
                     }
                 },
 
@@ -56,577 +49,394 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             this.constructor.superclass.clear.call(this);
                         }
                     } catch (error) {
-                        console.error('🎨 Error in hint clear:', error);
+                        console.error('Error in hint clear:', error);
                     }
+                },
+
+                renderImages: function(container, images) {
+                    if (!Array.isArray(images) || images.length === 0) return;
+
+                    const validImages = images.filter(isValidImageURL);
+                    if (validImages.length === 0) return;
+
+                    const imagesDiv = document.createElement('div');
+                    imagesDiv.className = 'figma-hint-images';
+
+                    const imagesToShow = validImages.slice(0, 3);
+                    const remainingCount = Math.max(0, validImages.length - 3);
+
+                    imagesToShow.forEach((imageUrl, index) => {
+                        const isLast = index === imagesToShow.length - 1;
+                        const hasOverlay = isLast && remainingCount > 0;
+
+                        if (hasOverlay) {
+                            const overlayDiv = document.createElement('div');
+                            overlayDiv.className = 'figma-hint-image-overlay';
+
+                            const img = document.createElement('img');
+                            img.className = 'figma-hint-image';
+                            img.src = imageUrl;
+                            img.alt = '';
+                            img.loading = 'lazy';
+
+                            const countDiv = document.createElement('div');
+                            countDiv.className = 'figma-hint-image-count';
+                            countDiv.textContent = `+${remainingCount}`;
+
+                            overlayDiv.appendChild(img);
+                            overlayDiv.appendChild(countDiv);
+                            imagesDiv.appendChild(overlayDiv);
+                        } else {
+                            const img = document.createElement('img');
+                            img.className = 'figma-hint-image';
+                            img.src = imageUrl;
+                            img.alt = '';
+                            img.loading = 'lazy';
+                            imagesDiv.appendChild(img);
+                        }
+                    });
+
+                    container.appendChild(imagesDiv);
                 },
 
                 injectStyles: function() {
                     if (document.getElementById('figma-hint-styles')) return;
 
-                    try {
-                        const style = document.createElement('style');
-                        style.id = 'figma-hint-styles';
-                        style.textContent = `
-                            .figma-hint {
-                                background: #fdf5f5;
-                                border: 1px solid rgba(54, 55, 45, 0.16);
-                                border-radius: 8px;
-                                padding: 8px;
-                                display: flex;
-                                gap: 8px;
-                                min-width: 230px;
-                                max-width: 350px;
-                                font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-                                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                                position: relative;
-                            }
-                            .figma-hint-main {
-                                flex: 1;
-                                display: flex;
-                                flex-direction: column;
-                                gap: 8px;
-                                min-width: 0;
-                                max-width: calc(100% - 48px);
-                            }
-                            .figma-hint-title {
-                                color: #36372d;
-                                font-size: 12px;
-                                font-weight: 400;
-                                line-height: 1.3;
-                                margin: 0;
-                                word-wrap: break-word;
-                                overflow-wrap: break-word;
-                            }
-                            .figma-hint-description {
-                                color: #36372d;
-                                font-size: 8px;
-                                font-weight: 400;
-                                line-height: 1.4;
-                                margin: 0;
-                                display: -webkit-box;
-                                -webkit-line-clamp: 2;
-                                -webkit-box-orient: vertical;
-                                overflow: hidden;
-                                text-overflow: ellipsis;
-                                word-wrap: break-word;
-                                overflow-wrap: break-word;
-                            }
-                            .figma-hint-coordinates {
-                                display: flex;
-                                gap: 16px;
-                                margin-top: 4px;
-                                flex-wrap: wrap;
-                            }
-                            .figma-coord-item {
-                                display: flex;
-                                flex-direction: column;
-                                gap: 2px;
-                                min-width: 0;
-                                flex-shrink: 1;
-                            }
-                            .figma-coord-label {
-                                color: #36372d;
-                                font-size: 8px;
-                                font-weight: 400;
-                                opacity: 0.7;
-                                white-space: nowrap;
-                            }
-                            .figma-coord-value {
-                                color: #36372d;
-                                font-size: 8px;
-                                font-weight: 400;
-                                white-space: nowrap;
-                                overflow: hidden;
-                                text-overflow: ellipsis;
-                            }
-                            .figma-hint-images {
-                                display: flex;
-                                flex-direction: column;
-                                gap: 4px;
-                                width: 32px;
-                                flex-shrink: 0;
-                                align-self: flex-start;
-                            }
-                            .figma-hint-image {
-                                width: 32px;
-                                height: 32px;
-                                border-radius: 4px;
-                                object-fit: cover;
-                                border: 1px solid rgba(54, 55, 45, 0.1);
-                                display: block;
-                            }
-                            .figma-hint-image-overlay {
-                                position: relative;
-                                width: 32px;
-                                height: 32px;
-                            }
-                            .figma-hint-image-overlay::after {
-                                content: '';
-                                position: absolute;
-                                top: 0;
-                                left: 0;
-                                right: 0;
-                                bottom: 0;
-                                background: rgba(0, 0, 0, 0.5);
-                                border-radius: 4px;
-                                pointer-events: none;
-                            }
-                            .figma-hint-image-count {
-                                position: absolute;
-                                top: 50%;
-                                left: 50%;
-                                transform: translate(-50%, -50%);
-                                color: white;
-                                font-size: 10px;
-                                font-weight: 700;
-                                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-                                z-index: 1;
-                                pointer-events: none;
-                            }
-                        `;
-                        document.head.appendChild(style);
-                    } catch (error) {
-                        console.error('🎨 Error injecting styles:', error);
-                    }
+                    const style = document.createElement('style');
+                    style.id = 'figma-hint-styles';
+                    style.textContent = `
+                        .figma-hint {
+                            background: #fdf5f5;
+                            border: 1px solid rgba(54, 55, 45, 0.16);
+                            border-radius: 8px;
+                            padding: 8px;
+                            display: flex;
+                            gap: 8px;
+                            min-width: 230px;
+                            max-width: 350px;
+                            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                        }
+                        .figma-hint-main {
+                            flex: 1;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                            min-width: 0;
+                            max-width: calc(100% - 48px);
+                        }
+                        .figma-hint-title {
+                            color: #36372d;
+                            font-size: 12px;
+                            font-weight: 400;
+                            line-height: 1.3;
+                            word-wrap: break-word;
+                        }
+                        .figma-hint-description {
+                            color: #36372d;
+                            font-size: 8px;
+                            line-height: 1.4;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                        }
+                        .figma-hint-coordinates {
+                            display: flex;
+                            gap: 16px;
+                            margin-top: 4px;
+                        }
+                        .figma-coord-item {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 2px;
+                        }
+                        .figma-coord-label {
+                            color: #36372d;
+                            font-size: 8px;
+                            opacity: 0.7;
+                        }
+                        .figma-coord-value {
+                            color: #36372d;
+                            font-size: 8px;
+                        }
+                        .figma-hint-images {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 4px;
+                            width: 32px;
+                            flex-shrink: 0;
+                        }
+                        .figma-hint-image {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 4px;
+                            object-fit: cover;
+                            border: 1px solid rgba(54, 55, 45, 0.1);
+                        }
+                        .figma-hint-image-overlay {
+                            position: relative;
+                            width: 32px;
+                            height: 32px;
+                        }
+                        .figma-hint-image-overlay::after {
+                            content: '';
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background: rgba(0, 0, 0, 0.5);
+                            border-radius: 4px;
+                        }
+                        .figma-hint-image-count {
+                            position: absolute;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            color: white;
+                            font-size: 10px;
+                            font-weight: 700;
+                            z-index: 1;
+                        }
+                    `;
+                    document.head.appendChild(style);
                 }
             }
         );
     } catch (error) {
-        console.error('🎨 Error creating hint layout:', error);
+        console.error('Error creating hint layout:', error);
         return null;
     }
 };
 
-const createSafeImageHTML = (images) => {
+const processImagesForHint = (images) => {
     try {
-        if (!Array.isArray(images) || images.length === 0) {
-            return '';
-        }
-
-        const validImages = images.filter(img =>
-            typeof img === 'string' && img.trim() !== ''
-        );
-
-        if (validImages.length === 0) {
-            return '';
-        }
-
-        let imagesHTML = '<div class="figma-hint-images">';
-        const imagesToShow = validImages.slice(0, 3);
-        const remainingCount = Math.max(0, validImages.length - 3);
-
-        imagesToShow.forEach((imageUrl, index) => {
-            const isLast = index === imagesToShow.length - 1;
-            const hasOverlay = isLast && remainingCount > 0;
-
-            if (hasOverlay) {
-                imagesHTML += `
-                    <div class="figma-hint-image-overlay">
-                        <img class="figma-hint-image" src="${imageUrl}" alt="">
-                        <div class="figma-hint-image-count">+${remainingCount}</div>
-                    </div>
-                `;
-            } else {
-                imagesHTML += `<img class="figma-hint-image" src="${imageUrl}" alt="">`;
-            }
-        });
-
-        imagesHTML += '</div>';
-        return imagesHTML;
-
+        if (!Array.isArray(images) || images.length === 0) return [];
+        return images.filter(img => typeof img === 'string' && img.trim() !== '').filter(isValidImageURL);
     } catch (error) {
-        console.error('🎨 Error creating image HTML:', error);
-        return '';
+        console.error('Error processing images:', error);
+        return [];
     }
 };
 
 function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapClick, pointToEdit, onEditPoint, waitingForCoordinates }) {
-    console.log('🗺️ YandexMap component RENDERING!', {
-        uiMode,
-        currentRouteId: currentRoute?.id,
-        currentRouteName: currentRoute?.name,
-        pointsCount: currentRoute?.points?.length || 0,
-        previewRouteId: previewRoute?.id,
-        previewRouteName: previewRoute?.name
-    });
-
     const mapContainerRef = useRef(null);
     const mapInstance = useRef(null);
     const [mapReady, setMapReady] = useState(false);
-    const ymaps = window.ymaps;
+    const [apiLoaded, setApiLoaded] = useState(false);
 
-    // useEffect[1] - Инициализация карты
+    // Проверяем загрузку Yandex Maps API
     useEffect(() => {
-        console.log('🗺️ YandexMap useEffect[1] - Map initialization');
-        if (!mapContainerRef.current || !ymaps) {
-            console.log('🗺️ Missing container or ymaps:', {
-                container: !!mapContainerRef.current,
-                ymaps: !!ymaps
-            });
-            return;
-        }
+        const checkYmapsLoaded = () => {
+            if (window.ymaps) {
+                setApiLoaded(true);
+            } else {
+                // Если API еще не загружен, проверяем через 100мс
+                setTimeout(checkYmapsLoaded, 100);
+            }
+        };
+
+        checkYmapsLoaded();
+    }, []);
+
+    useEffect(() => {
+        if (!mapContainerRef.current || !apiLoaded || !window.ymaps) return;
+
+        const ymaps = window.ymaps;
 
         ymaps.ready(() => {
-            console.log('🗺️ ymaps.ready() callback executed');
             if (!mapInstance.current && mapContainerRef.current) {
-                console.log('🗺️ Creating new map instance');
-                const map = new ymaps.Map(mapContainerRef.current, {
-                    center: [55.75, 37.57],
-                    zoom: 10,
-                    controls: ['zoomControl', 'fullscreenControl']
-                }, {
-                    suppressMapOpenBlock: true
-                });
-
                 try {
-                    map.controls.add('rulerControl');
-                    console.log('📏 Ruler control added successfully');
-                } catch (e) {
-                    console.warn('📏 Failed to add ruler control:', e);
+                    const map = new ymaps.Map(mapContainerRef.current, {
+                        center: [55.75, 37.57],
+                        zoom: 10,
+                        controls: ['zoomControl', 'fullscreenControl']
+                    }, {
+                        suppressMapOpenBlock: true
+                    });
+
+                    try {
+                        map.controls.add('rulerControl');
+                    } catch (e) {
+                        console.warn('Failed to add ruler control:', e);
+                    }
+
+                    map.events.add('click', (e) => {
+                        const coords = e.get('coords');
+                        const roundedCoords = [
+                            Math.round(coords[0] * 1000000) / 1000000,
+                            Math.round(coords[1] * 1000000) / 1000000
+                        ];
+                        onMapClick(roundedCoords);
+                    });
+
+                    mapInstance.current = map;
+                    setMapReady(true);
+                } catch (error) {
+                    console.error('Error creating map:', error);
                 }
-
-                map.events.add('click', (e) => {
-                    console.log('🗺️ Map clicked at:', e.get('coords'));
-                    onMapClick(e.get('coords'));
-                });
-
-                mapInstance.current = map;
-                setMapReady(true);
-                console.log('🗺️ Map instance created successfully');
             }
         });
 
         return () => {
-            console.log('🗺️ YandexMap cleanup');
             if (mapInstance.current) {
-                mapInstance.current.destroy();
+                try {
+                    mapInstance.current.destroy();
+                } catch (error) {
+                    console.error('Error destroying map:', error);
+                }
                 mapInstance.current = null;
             }
             setMapReady(false);
-
             const styleElement = document.getElementById('figma-hint-styles');
-            if (styleElement) {
-                styleElement.remove();
-            }
+            if (styleElement) styleElement.remove();
         };
-    }, [ymaps, onMapClick]);
+    }, [apiLoaded, onMapClick]);
 
-    // useEffect[2] - Обновление карты при изменении данных
     useEffect(() => {
-        console.log('🗺️ YandexMap useEffect[2] - Map update');
-
         const map = mapInstance.current;
-        if (!map || !ymaps || !mapReady) {
-            console.log('🗺️ Skipping update:', {
-                hasMap: !!map,
-                hasYmaps: !!ymaps,
-                mapReady
-            });
-            return;
-        }
+        if (!map || !window.ymaps || !mapReady) return;
 
-        console.log('🗺️ Clearing existing objects');
-        map.geoObjects.removeAll();
+        const ymaps = window.ymaps;
 
-        let SafeHintLayout = null;
         try {
-            SafeHintLayout = createSafePlacemarkHintLayout(ymaps);
-            if (SafeHintLayout) {
-                console.log('🎨 Safe Figma HintLayout created successfully');
+            map.geoObjects.removeAll();
+
+            let SafeHintLayout = null;
+            try {
+                SafeHintLayout = createSafePlacemarkHintLayout(ymaps);
+            } catch (error) {
+                console.error('Error creating SafeHintLayout:', error);
             }
-        } catch (error) {
-            console.error('🎨 Error creating SafeHintLayout:', error);
-        }
 
-        if (uiMode === UI_MODE.MAIN_LIST && previewRoute && previewRoute.points && previewRoute.points.length > 0) {
-            console.log('🗺️ PREVIEW MODE detected for route:', previewRoute.name);
-
-            const validPoints = [];
-            previewRoute.points.forEach((point) => {
-                const lat = parseFloat(point.lat);
-                const lon = parseFloat(point.lon);
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    validPoints.push({ ...point, latParsed: lat, lonParsed: lon });
+            const createSafePlacemarkData = (point) => {
+                let processedImages = [];
+                if (Array.isArray(point.images)) {
+                    processedImages = processImagesForHint(point.images);
                 }
-            });
 
-            console.log(`🗺️ Preview valid points: ${validPoints.length}`);
+                return {
+                    name: (point.name || 'Без названия').toString().replace(/[<>&"']/g, ''),
+                    description: (point.description || 'Без описания').toString().replace(/[<>&"']/g, ''),
+                    lat: decimalToDMS(point.latParsed || parseFloat(point.lat)),
+                    lon: decimalToDMS(point.lonParsed || parseFloat(point.lon)),
+                    images: processedImages
+                };
+            };
 
-            if (validPoints.length > 0) {
-                // Создаем метки для preview (без взаимодействия)
-                validPoints.forEach((point, index) => {
-                    const coords = [point.latParsed, point.lonParsed];
+            // PREVIEW MODE
+            if (uiMode === UI_MODE.MAIN_LIST && previewRoute && previewRoute.points && previewRoute.points.length > 0) {
+                const validPoints = previewRoute.points
+                    .map(point => {
+                        const lat = parseFloat(point.lat);
+                        const lon = parseFloat(point.lon);
+                        return !isNaN(lat) && !isNaN(lon) ? { ...point, latParsed: lat, lonParsed: lon } : null;
+                    })
+                    .filter(Boolean);
 
-                    try {
-                        let processedImages = [];
-                        if (Array.isArray(point.images)) {
-                            processedImages = point.images.filter(img =>
-                                typeof img === 'string' && img.trim() !== ''
-                            );
-                        }
-
-                        const safeData = {
-                            name: (point.name || 'Без названия').toString().replace(/[<>&"]/g, ''),
-                            description: (point.description || 'Без описания').toString().replace(/[<>&"]/g, ''),
-                            lat: decimalToDMS(point.latParsed),
-                            lon: decimalToDMS(point.lonParsed),
-                            imagesHtml: createSafeImageHTML(processedImages)
-                        };
-
-                        const imageText = processedImages.length > 0 ? ` | 📷 ${processedImages.length} фото` : '';
-                        const fallbackHintText = `${point.name || 'Без названия'}\n${point.description || 'Без описания'}\n📍 ${safeData.lat}, ${safeData.lon}${imageText}`;
+                if (validPoints.length > 0) {
+                    validPoints.forEach((point, index) => {
+                        const coords = [point.latParsed, point.lonParsed];
+                        const safeData = createSafePlacemarkData(point);
 
                         const placemarkOptions = {
-                            preset: 'islands#redDotIcon', // Красный цвет для preview
+                            preset: 'islands#redDotIcon',
                             iconContent: String(index + 1),
-                            hideIconOnBalloonOpen: false,
-                            cursor: 'default' // Без указателя клика
+                            hideIconOnBalloonOpen: false
                         };
 
                         if (SafeHintLayout) {
-                            try {
-                                placemarkOptions.hintLayout = SafeHintLayout;
-                                placemarkOptions.hintOffset = [15, 15];
-                                placemarkOptions.hintPane = 'outerHint';
-                            } catch (error) {
-                                console.error(`🎨 Error setting hint for preview placemark ${index}:`, error);
-                            }
+                            placemarkOptions.hintLayout = SafeHintLayout;
+                            placemarkOptions.hintOffset = [15, 15];
                         }
 
-                        const placemark = new ymaps.Placemark(coords, {
-                            safeData: safeData,
-                            hintContent: fallbackHintText
-                        }, placemarkOptions);
-
+                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
                         map.geoObjects.add(placemark);
-                        console.log(`🗺️ Added preview placemark ${index}`);
-                    } catch (error) {
-                        console.error(`🗺️ Error creating preview placemark ${index}:`, error);
-                    }
-                });
+                    });
 
-                // Линия маршрута для preview
-                if (validPoints.length > 1) {
-                    try {
-                        const coordinates = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                        const polyline = new ymaps.Polyline(coordinates, {}, {
-                            strokeColor: "#b3342b", // Красный цвет для preview
-                            strokeWidth: 3,
-                            strokeOpacity: 0.6
-                        });
+                    if (validPoints.length > 1) {
+                        const polyline = new ymaps.Polyline(
+                            validPoints.map(p => [p.latParsed, p.lonParsed]),
+                            {},
+                            { strokeColor: "#b3342b", strokeWidth: 3, strokeOpacity: 0.6 }
+                        );
                         map.geoObjects.add(polyline);
-                        console.log('🗺️ Added preview polyline');
-                    } catch (error) {
-                        console.error('🗺️ Error creating preview polyline:', error);
                     }
-                }
 
-                // Центрируем карту на preview маршруте
-                try {
-                    const bounds = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                    if (bounds.length > 0) {
-                        map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40 });
-                        console.log('🗺️ Centered map on preview route');
-                    }
-                } catch (error) {
-                    console.error('🗺️ Error setting bounds for preview:', error);
+                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
                 }
             }
-        }
 
-        // Проверяем режим просмотра маршрута
-        else if (uiMode === UI_MODE.VIEW_ROUTE_DETAILS && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
-            console.log('🗺️ VIEW_ROUTE_DETAILS mode detected');
+            // VIEW_ROUTE_DETAILS MODE
+            else if (uiMode === UI_MODE.VIEW_ROUTE_DETAILS && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
+                const validPoints = currentRoute.points
+                    .map(point => {
+                        const lat = parseFloat(point.lat);
+                        const lon = parseFloat(point.lon);
+                        return !isNaN(lat) && !isNaN(lon) ? { ...point, latParsed: lat, lonParsed: lon } : null;
+                    })
+                    .filter(Boolean);
 
-            const validPoints = [];
-            currentRoute.points.forEach((point) => {
-                const lat = parseFloat(point.lat);
-                const lon = parseFloat(point.lon);
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    validPoints.push({ ...point, latParsed: lat, lonParsed: lon });
-                }
-            });
-
-            console.log(`🗺️ Valid points count: ${validPoints.length}`);
-
-            if (validPoints.length > 0) {
-                validPoints.forEach((point, index) => {
-                    const coords = [point.latParsed, point.lonParsed];
-
-                    try {
-                        let processedImages = [];
-                        if (Array.isArray(point.images)) {
-                            processedImages = point.images.filter(img =>
-                                typeof img === 'string' && img.trim() !== ''
-                            );
-                        }
-
-                        const safeData = {
-                            name: (point.name || 'Без названия').toString().replace(/[<>&"]/g, ''),
-                            description: (point.description || 'Без описания').toString().replace(/[<>&"]/g, ''),
-                            lat: decimalToDMS(point.latParsed),
-                            lon: decimalToDMS(point.lonParsed),
-                            imagesHtml: createSafeImageHTML(processedImages)
-                        };
-
-                        const imageText = processedImages.length > 0 ? ` | 📷 ${processedImages.length} фото` : '';
-                        const fallbackHintText = `${point.name || 'Без названия'}\n${point.description || 'Без описания'}\n📍 ${safeData.lat}, ${safeData.lon}${imageText}`;
-
-                        const placemarkProperties = {
-                            safeData: safeData,
-                            hintContent: fallbackHintText,
-                            balloonContent: `
-                                <div style="max-width: 300px;">
-                                    <h3 style="margin: 0 0 8px 0; color: #36372d; font-size: 16px;">${point.name || 'Без названия'}</h3>
-                                    <p style="margin: 0 0 8px 0; color: #666; font-size: 14px; line-height: 1.4;">${point.description || 'Без описания'}</p>
-                                    <div style="display: flex; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #888;">
-                                        <div>
-                                            <div style="font-weight: 500;">Широта</div>
-                                            <div>${safeData.lat}</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 500;">Долгота</div>
-                                            <div>${safeData.lon}</div>
-                                        </div>
-                                    </div>
-                                    ${processedImages.length > 0 ? `
-                                        <div style="margin-top: 12px;">
-                                            <div style="margin-bottom: 8px; font-weight: 500; color: #36372d;">Фотографии (${processedImages.length}):</div>
-                                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                                                ${processedImages.slice(0, 6).map((image, imgIndex) => `
-                                                    <div style="position: relative; width: 60px; height: 60px;">
-                                                        <img src="${image}"
-                                                             style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd;"
-                                                             alt="Фото ${imgIndex + 1}"
-                                                             onclick="window.open('${image}', '_blank')">
-                                                        ${imgIndex === 5 && processedImages.length > 6 ?
-                                                            `<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; cursor: pointer;">+${processedImages.length - 6}</div>` : ''
-                                                        }
-                                                    </div>
-                                                `).join('')}
-                                            </div>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `
-                        };
+                if (validPoints.length > 0) {
+                    validPoints.forEach((point, index) => {
+                        const coords = [point.latParsed, point.lonParsed];
+                        const safeData = createSafePlacemarkData(point);
 
                         const placemarkOptions = {
                             preset: 'islands#blueDotIcon',
-                            iconContent: String(index + 1),
-                            hideIconOnBalloonOpen: false,
-                            balloonMaxWidth: 350,
-                            balloonPanelMaxMapArea: 0,
-                            balloonOffset: [0, -40]
-                        };
-
-                        if (SafeHintLayout) {
-                            try {
-                                placemarkOptions.hintLayout = SafeHintLayout;
-                                placemarkOptions.hintOffset = [15, 15];
-                                placemarkOptions.hintPane = 'outerHint';
-                            } catch (error) {
-                                console.error(`🎨 Error setting custom hint for placemark ${index}:`, error);
-                            }
-                        }
-
-                        const placemark = new ymaps.Placemark(coords, placemarkProperties, placemarkOptions);
-                        map.geoObjects.add(placemark);
-                    } catch (error) {
-                        console.error(`🗺️ Error creating placemark ${index}:`, error);
-                    }
-                });
-
-                if (validPoints.length > 1) {
-                    try {
-                        const coordinates = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                        const polyline = new ymaps.Polyline(coordinates, {}, {
-                            strokeColor: "#0000FF",
-                            strokeWidth: 4,
-                            strokeOpacity: 0.8
-                        });
-                        map.geoObjects.add(polyline);
-                    } catch (error) {
-                        console.error('🗺️ Error creating polyline:', error);
-                    }
-                }
-
-                try {
-                    const bounds = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                    if (bounds.length > 0) {
-                        map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40 });
-                    }
-                } catch (error) {
-                    console.error('🗺️ Error setting bounds:', error);
-                }
-            }
-        }
-
-        // Режим создания/редактирования маршрута
-        else if ((uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE) && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
-            console.log('🗺️ CREATE/EDIT ROUTE mode detected');
-
-            const validPoints = [];
-            currentRoute.points.forEach((point) => {
-                const lat = parseFloat(point.lat);
-                const lon = parseFloat(point.lon);
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    validPoints.push({ ...point, latParsed: lat, lonParsed: lon });
-                }
-            });
-
-            if (validPoints.length > 0) {
-                validPoints.forEach((point, index) => {
-                    const coords = [point.latParsed, point.lonParsed];
-
-                    try {
-                        let processedImages = [];
-                        if (Array.isArray(point.images)) {
-                            processedImages = point.images.filter(img =>
-                                typeof img === 'string' && img.trim() !== ''
-                            );
-                        }
-
-                        const safeData = {
-                            name: (point.name || 'Без названия').toString().replace(/[<>&"]/g, ''),
-                            description: (point.description || 'Без описания').toString().replace(/[<>&"]/g, ''),
-                            lat: decimalToDMS(point.latParsed),
-                            lon: decimalToDMS(point.lonParsed),
-                            imagesHtml: createSafeImageHTML(processedImages)
-                        };
-
-                        const imageText = processedImages.length > 0 ? ` | 📷 ${processedImages.length} фото` : '';
-                        const fallbackHintText = `${point.name || 'Без названия'}\n${point.description || 'Без описания'}\n📍 ${safeData.lat}, ${safeData.lon}${imageText}`;
-
-                        const placemarkOptions = {
-                            preset: 'islands#greenDotIcon',
                             iconContent: String(index + 1),
                             hideIconOnBalloonOpen: false,
                             balloonMaxWidth: 350
                         };
 
                         if (SafeHintLayout) {
-                            try {
-                                placemarkOptions.hintLayout = SafeHintLayout;
-                                placemarkOptions.hintOffset = [15, 15];
-                                placemarkOptions.hintPane = 'outerHint';
-                            } catch (error) {
-                                console.error(`🎨 Error setting custom hint for GREEN placemark ${index}:`, error);
-                            }
+                            placemarkOptions.hintLayout = SafeHintLayout;
+                            placemarkOptions.hintOffset = [15, 15];
                         }
 
-                        const placemark = new ymaps.Placemark(coords, {
-                            safeData: safeData,
-                            hintContent: fallbackHintText,
-                            balloonContent: `
-                                <div style="max-width: 300px;">
-                                    <h3 style="margin: 0 0 8px 0; color: #36372d;">${point.name || 'Без названия'}</h3>
-                                    <p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${point.description || 'Без описания'}</p>
-                                    <small style="color: #888;">📍 ${safeData.lat}, ${safeData.lon}</small>
-                                    ${processedImages.length > 0 ? `<br><small style="color: #888;">📷 ${processedImages.length} фотографий</small>` : ''}
-                                </div>
-                            `
-                        }, placemarkOptions);
+                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
+                        map.geoObjects.add(placemark);
+                    });
+
+                    if (validPoints.length > 1) {
+                        const polyline = new ymaps.Polyline(
+                            validPoints.map(p => [p.latParsed, p.lonParsed]),
+                            {},
+                            { strokeColor: "#0000FF", strokeWidth: 4, strokeOpacity: 0.8 }
+                        );
+                        map.geoObjects.add(polyline);
+                    }
+
+                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
+                }
+            }
+
+            // CREATE/EDIT ROUTE MODE
+            else if ((uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE) && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
+                const validPoints = currentRoute.points
+                    .map(point => {
+                        const lat = parseFloat(point.lat);
+                        const lon = parseFloat(point.lon);
+                        return !isNaN(lat) && !isNaN(lon) ? { ...point, latParsed: lat, lonParsed: lon } : null;
+                    })
+                    .filter(Boolean);
+
+                if (validPoints.length > 0) {
+                    validPoints.forEach((point, index) => {
+                        const coords = [point.latParsed, point.lonParsed];
+                        const safeData = createSafePlacemarkData(point);
+
+                        const placemarkOptions = {
+                            preset: 'islands#greenDotIcon',
+                            iconContent: String(index + 1),
+                            hideIconOnBalloonOpen: false
+                        };
+
+                        if (SafeHintLayout) {
+                            placemarkOptions.hintLayout = SafeHintLayout;
+                            placemarkOptions.hintOffset = [15, 15];
+                        }
+
+                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
 
                         placemark.events.add('click', (e) => {
                             e.stopPropagation();
@@ -634,58 +444,52 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                         });
 
                         map.geoObjects.add(placemark);
-                    } catch (error) {
-                        console.error(`🗺️ Error creating GREEN placemark ${index}:`, error);
-                    }
-                });
+                    });
 
-                if (validPoints.length > 1) {
-                    try {
-                        const coordinates = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                        const polyline = new ymaps.Polyline(coordinates, {}, {
-                            strokeColor: "#536C45",
-                            strokeWidth: 4,
-                            strokeOpacity: 0.8
-                        });
+                    if (validPoints.length > 1) {
+                        const polyline = new ymaps.Polyline(
+                            validPoints.map(p => [p.latParsed, p.lonParsed]),
+                            {},
+                            { strokeColor: "#536C45", strokeWidth: 4, strokeOpacity: 0.8 }
+                        );
                         map.geoObjects.add(polyline);
-                    } catch (error) {
-                        console.error('🗺️ Error creating GREEN polyline:', error);
                     }
-                }
 
-                try {
-                    const bounds = validPoints.map(p => [p.latParsed, p.lonParsed]);
-                    map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 40 });
-                } catch (error) {
-                    console.error('🗺️ Error setting bounds for editing:', error);
+                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
                 }
             }
-        }
 
-        // Режим добавления временной точки
-        else if (tempPointCoords && (uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE)) {
-            console.log('🗺️ Adding temporary point at:', tempPointCoords);
-            try {
+            // TEMP POINT MODE
+            else if (tempPointCoords && (uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE)) {
                 const tempPlacemark = new ymaps.Placemark(tempPointCoords, {
-                    hintContent: 'Новая точка',
-                    balloonContent: 'Заполните информацию о точке'
+                    hintContent: 'Новая точка'
                 }, {
                     preset: 'islands#redDotIcon',
                     draggable: true
                 });
 
-                tempPlacemark.events.add('dragend', (e) => {
-                    const newCoords = e.get('target').geometry.getCoordinates();
-                    console.log('🗺️ Temp placemark moved to:', newCoords);
-                });
-
                 map.geoObjects.add(tempPlacemark);
-            } catch (error) {
-                console.error('🗺️ Error creating temporary placemark:', error);
             }
+        } catch (error) {
+            console.error('Error updating map:', error);
         }
 
-    }, [ymaps, uiMode, currentRoute, previewRoute, tempPointCoords, pointToEdit, onEditPoint, waitingForCoordinates, mapReady]);
+    }, [apiLoaded, uiMode, currentRoute, previewRoute, tempPointCoords, pointToEdit, onEditPoint, mapReady]);
+
+    if (!apiLoaded) {
+        return (
+            <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#f0f0f0'
+            }}>
+                <p>Загрузка карты...</p>
+            </div>
+        );
+    }
 
     return <div id="yandex-map" ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />;
 }

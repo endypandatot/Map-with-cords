@@ -1,3 +1,4 @@
+// src/components/RoutesList.js
 import React, { useContext } from 'react';
 import { RouteContext } from '../App';
 import RouteItem from './RouteItem';
@@ -5,22 +6,29 @@ import RouteItem from './RouteItem';
 function RoutesList({ onRouteHoverStart, onRouteHoverEnd }) {
     const { routes } = useContext(RouteContext);
 
+    if (!routes || routes.length === 0) {
+        return (
+            <div style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: 'rgba(48, 55, 45, 0.40)',
+                fontSize: '14px'
+            }}>
+                Нет созданных маршрутов
+            </div>
+        );
+    }
+
     return (
         <>
-            {routes.length === 0 ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                    Маршрутов пока нет. Добавьте первый маршрут!
-                </div>
-            ) : (
-                routes.map(route => (
-                    <RouteItem
-                        key={route.id}
-                        routeData={route}
-                        onHoverStart={onRouteHoverStart}
-                        onHoverEnd={onRouteHoverEnd}
-                    />
-                ))
-            )}
+            {routes.map(route => (
+                <RouteItem
+                    key={route.id}
+                    route={route}
+                    onMouseEnter={onRouteHoverStart}
+                    onMouseLeave={onRouteHoverEnd}
+                />
+            ))}
         </>
     );
 }

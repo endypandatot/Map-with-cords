@@ -1,115 +1,117 @@
-import React, { useState, useContext, useCallback } from 'react';
+// src/components/RouteItem.js
+import React, { useState, useContext } from 'react';
 import { RouteContext } from '../App';
-import DeleteIcon from './SvgIcons/DeleteIcon';
+import { API_BASE_URL } from '../api';
 import EditIcon from './SvgIcons/EditIcon';
+import DeleteIcon from './SvgIcons/DeleteIcon';
 import PhotoIcon from './SvgIcons/PhotoIcon';
 import ArrowDownIcon from './SvgIcons/ArrowDownIcon';
-import { API_BASE_URL } from '../api';
 
-const RouteListPointItem = React.memo(({ point, index }) => {
+const RouteItem = ({ route, onMouseEnter, onMouseLeave }) => {
+    const { startEditRoute, handleDeleteRoute, startViewRoute } = useContext(RouteContext);
+    const [showPoints, setShowPoints] = useState(false);
 
     // Обработка изображений
-    const processedImages = (point.images || []).map(img => {
-        if (typeof img === 'string') {
-            return img;
-        }
-        if (typeof img === 'object' && img !== null && img.image) {
-            return `${API_BASE_URL}${img.image}`;
-        }
-        return null;
-    }).filter(Boolean);
+    const processedPoints = route.points?.map(point => ({
+        ...point,
+        images: (point.images || []).map(img => {
+            if (typeof img === 'string') return img;
+            if (typeof img === 'object' && img !== null && img.image) {
+                return `${API_BASE_URL}${img.image}`;
+            }
+            return null;
+        }).filter(Boolean)
+    })) || [];
 
-    const visibleImages = processedImages.slice(0, 3);
-    const remainingImagesCount = processedImages.length - visibleImages.length;
+    // Проверяем есть ли хоть одно изображение в маршруте
+    const hasAnyImages = processedPoints.some(point => point.images && point.images.length > 0);
 
-    return (
-        <div className="route-point">
-            <div className="route-point-icon">
-                <div className="dot dot-1"></div><div className="dot dot-2"></div><div className="dot dot-3"></div>
-                <div className="dot dot-4"></div><div className="dot dot-5"></div><div className="dot dot-6"></div>
-            </div>
-            <div className="route-point-content">
-                <div className="route-point-name">{point.name || `Точка ${index + 1}`}</div>
-                {processedImages.length > 0 && (
-                    <div className="route-point-images-inline">
-                        <div className="image-container">
-                            {visibleImages.map((src, idx) => (
-                                <img key={idx} src={src} alt="" />
-                            ))}
-                        </div>
-                        {remainingImagesCount > 0 && (
-                            <div className="image-count">+{remainingImagesCount}</div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-});
-
-const RouteItem = ({ routeData, onHoverStart, onHoverEnd }) => {
-    const { startEditRoute, handleDeleteRoute, startViewRoute } = useContext(RouteContext);
-    const [pointsListVisible, setPointsListVisible] = useState(false);
-
-    const handleSelectRoute = useCallback(() => {
-        console.log('🎯 Route selected for viewing:', routeData);
-        startViewRoute(routeData.id);
-    }, [startViewRoute, routeData]);
-
-    const handleEdit = useCallback((e) => {
+    const handleEdit = (e) => {
         e.stopPropagation();
-        startEditRoute(routeData.id);
-    }, [startEditRoute, routeData.id]);
+        startEditRoute(route.id);
+    };
 
-    const handleDelete = useCallback((e) => {
+    const handleDelete = (e) => {
         e.stopPropagation();
-        handleDeleteRoute(routeData.id);
-    }, [handleDeleteRoute, routeData.id]);
+        handleDeleteRoute(route.id);
+    };
 
-    const togglePointsList = useCallback((e) => {
+    const handleView = (e) => {
+        // Если кликнули на кнопки действий, не открываем просмотр
+        if (e.target.closest('.route-action-btn')) return;
+        // Если кликнули на стрелку точек, не открываем просмотр
+        if (e.target.closest('.route-points-wrapper')) return;
+        startViewRoute(route.id);
+    };
+
+    const togglePoints = (e) => {
         e.stopPropagation();
-        setPointsListVisible(prev => !prev);
-    }, []);
-
-    const handleMouseEnter = useCallback(() => {
-        if (onHoverStart) {
-            onHoverStart(routeData.id);
-        }
-    }, [onHoverStart, routeData.id]);
-
-    const handleMouseLeave = useCallback(() => {
-        if (onHoverEnd) {
-            onHoverEnd();
-        }
-    }, [onHoverEnd]);
-
-    const hasPhotos = routeData.points.some(p => p.images && p.images.length > 0);
+        setShowPoints(!showPoints);
+    };
 
     return (
         <div
             className="route-item"
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
+            onMouseEnter={() => onMouseEnter(route.id)}
+            onMouseLeave={onMouseLeave}
+            onClick={handleView}
         >
             <div className="route-item-content">
+                {/* Заголовок с названием и действиями */}
                 <div className="route-title-wrapper">
-                    <div className="route-title-container" onClick={handleSelectRoute}>
-                        <div className="route-title">{routeData.name || 'Без названия'}</div>
-                        {hasPhotos && <PhotoIcon className="photo-icon" />}
+                    <div className="route-title-container">
+                        <div className="route-title">{route.name || 'Без названия'}</div>
+                        {hasAnyImages && (
+                            <PhotoIcon className="photo-icon" />
+                        )}
                     </div>
                     <div className="route-actions">
-                        <span onClick={handleEdit}><EditIcon className="route-action-btn edit-btn" /></span>
-                        <span onClick={handleDelete}><DeleteIcon className="route-action-btn delete-btn" /></span>
+                        <EditIcon className="route-action-btn" onClick={handleEdit} />
+                        <DeleteIcon className="route-action-btn" onClick={handleDelete} />
                     </div>
                 </div>
-                <div className="route-description">{routeData.description || 'Без описания'}</div>
-                <div className="route-points-wrapper" onClick={togglePointsList}>
-                    <span>{routeData.points.length} точки</span>
-                    <ArrowDownIcon className={pointsListVisible ? 'active' : ''} />
-                </div>
-                <div className={`route-points-list ${pointsListVisible ? 'visible' : ''}`}>
-                    {routeData.points.map((point, index) => (
-                        <RouteListPointItem key={point.id || index} point={point} index={index} />
+
+                {/* Описание */}
+                {route.description && (
+                    <div className="route-description">{route.description}</div>
+                )}
+
+                {/* Точки маршрута (сворачиваемые) */}
+                {processedPoints.length > 0 && (
+                    <div className="route-points-wrapper" onClick={togglePoints}>
+                        <ArrowDownIcon className={showPoints ? 'active' : ''} />
+                        <span>{processedPoints.length} точки</span>
+                    </div>
+                )}
+
+                {/* Список точек (показывается при раскрытии) */}
+                <div className={`route-points-list ${showPoints ? 'visible' : ''}`}>
+                    {processedPoints.map((point, index) => (
+                        <div key={point.id || index} className="route-point">
+                            <div className="route-point-icon">
+                                <div className="dot dot-1"></div>
+                                <div className="dot dot-2"></div>
+                                <div className="dot dot-3"></div>
+                                <div className="dot dot-4"></div>
+                                <div className="dot dot-5"></div>
+                                <div className="dot dot-6"></div>
+                            </div>
+                            <div className="route-point-content">
+                                <div className="route-point-name">{point.name || 'Без названия'}</div>
+                                {point.images && point.images.length > 0 && (
+                                    <div className="route-point-images-inline">
+                                        <div className="image-container">
+                                            {point.images.slice(0, 3).map((src, idx) => (
+                                                <img key={idx} src={src} alt="" />
+                                            ))}
+                                        </div>
+                                        {point.images.length > 3 && (
+                                            <div className="image-count">+{point.images.length - 3}</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>

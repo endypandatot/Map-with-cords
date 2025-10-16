@@ -1,18 +1,45 @@
-
+// src/api.js
 import axios from 'axios';
 
-export const API_BASE_URL = 'http://localhost:8000';
+
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
+// Функция для получения CSRF-токена из cookie
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/`,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Добавим interceptor для логирования всех запросов
 api.interceptors.request.use(
   config => {
+    // Добавляем CSRF-токен для небезопасных методов
+    if (['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+      const csrfToken = getCookie('csrftoken');
+      if (csrfToken) {
+        config.headers['X-CSRFToken'] = csrfToken;
+      } else {
+        console.warn('⚠️ CSRF token not found in cookies');
+      }
+    }
+
     console.log('API Request:', {
       method: config.method?.toUpperCase(),
       url: config.url,
@@ -27,7 +54,7 @@ api.interceptors.request.use(
   }
 );
 
-// Добавим interceptor для логирования всех ответов
+// Interceptor для логирования всех ответов
 api.interceptors.response.use(
   response => {
     console.log('API Response:', {
@@ -48,6 +75,11 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Преобразует строку Data URL (Base64) в объект Blob.
+ * @param {string} dataurl - Строка в формате "data:image/png;base64,..."
+ * @returns {Blob|null} - Объект Blob или null в случае ошибки.
+ */
 const dataURLtoBlob = (dataurl) => {
   try {
     const arr = dataurl.split(',');
@@ -84,10 +116,12 @@ export const routeApi = {
     base64Images.forEach((base64String, index) => {
       console.log(`Converting image ${index}:`, base64String.substring(0, 100) + '...');
 
+      // Преобразуем каждую строку Base64 в Blob
       const blob = dataURLtoBlob(base64String);
 
       if (blob) {
         console.log(`Successfully converted image ${index} to blob:`, blob);
+        // Добавляем Blob в formData как файл
         formData.append('images', blob, `image_${index}.png`);
       } else {
         console.error(`Failed to convert image ${index} to blob`);
@@ -106,6 +140,16 @@ export const routeApi = {
       },
     });
   },
+
+  fetchCsrfToken: async () => {
+    try {
+      // Делаем GET-запрос на любой endpoint, чтобы получить CSRF cookie
+      await api.get('routes/');
+      console.log('✅ CSRF token fetched successfully');
+    } catch (error) {
+      console.error('❌ Failed to fetch CSRF token:', error);
+    }
+  }
 };
 
 export default api;

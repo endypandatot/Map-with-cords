@@ -1,0 +1,10 @@
+// src/constants/uiModes.js
+
+export const UI_MODE = {
+    MAIN_LIST: 'MAIN_LIST',
+    CREATE_ROUTE: 'CREATE_ROUTE',
+    EDIT_ROUTE: 'EDIT_ROUTE',
+    CREATE_POINT: 'CREATE_POINT',
+    EDIT_POINT: 'EDIT_POINT',
+    VIEW_ROUTE_DETAILS: 'VIEW_ROUTE_DETAILS'
+};
