@@ -1,6 +1,4 @@
-// src/api/apiClient.js
 import axios from 'axios';
-
 
 export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
@@ -20,18 +18,26 @@ function getCookie(name) {
   return cookieValue;
 }
 
-const api = axios.create({
+// Создание единого axios instance
+const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true,
 });
 
-// Interceptor для добавления CSRF-токена ко всем запросам
-api.interceptors.request.use(
+// Request interceptor - добавляем CSRF токен и устанавливаем Content-Type
+apiClient.interceptors.request.use(
   config => {
-    // Добавляем CSRF-токен для небезопасных методов
+    if (!config.headers['Content-Type']) {
+      // Если передаётся FormData, не устанавливаем Content-Type (браузер сделает это сам)
+      if (!(config.data instanceof FormData)) {
+        config.headers['Content-Type'] = 'application/json';
+      }
+    } else if (config.headers['Content-Type'] === undefined) {
+      // Если Content-Type явно установлен в undefined, удаляем его
+      delete config.headers['Content-Type'];
+    }
+
+    // Добавляем CSRF токен для небезопасных методов
     if (['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
       const csrfToken = getCookie('csrftoken');
       if (csrfToken) {
@@ -44,8 +50,9 @@ api.interceptors.request.use(
     console.log('API Request:', {
       method: config.method?.toUpperCase(),
       url: config.url,
-      data: config.data,
-      headers: config.headers
+      contentType: config.headers['Content-Type'],
+      isFormData: config.data instanceof FormData,
+      data: config.data instanceof FormData ? '[FormData]' : config.data
     });
     return config;
   },
@@ -55,8 +62,8 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor для логирования всех ответов
-api.interceptors.response.use(
+// Response interceptor - обработка ответов
+apiClient.interceptors.response.use(
   response => {
     console.log('API Response:', {
       status: response.status,
@@ -76,16 +83,4 @@ api.interceptors.response.use(
   }
 );
 
-/**
- * Получить CSRF-токен (вызывать при загрузке приложения)
- */
-export const fetchCsrfToken = async () => {
-  try {
-    await api.get('routes/');
-    console.log('✅ CSRF token fetched successfully');
-  } catch (error) {
-    console.error('❌ Failed to fetch CSRF token:', error);
-  }
-};
-
-export default api;
+export default apiClient;

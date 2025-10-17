@@ -1,4 +1,3 @@
-// src/constants/uiModes.js
 
 export const UI_MODE = {
     MAIN_LIST: 'MAIN_LIST',

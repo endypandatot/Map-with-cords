@@ -1,4 +1,3 @@
-// src/hooks/useRoutes.js
 import { useState, useCallback } from 'react';
 import { routesApi } from '../api/routes';
 import { pointsApi } from '../api/points';

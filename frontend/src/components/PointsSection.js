@@ -1,4 +1,3 @@
-// src/components/PointsSection.js
 import React from 'react';
 import {
     DndContext,

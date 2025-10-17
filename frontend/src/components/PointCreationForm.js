@@ -1,9 +1,8 @@
-// src/components/PointCreationForm.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LIMITS, LIMIT_MESSAGES, checkLimits } from '../constants/limits';
 import CancelIcon from './SvgIcons/CancelIcon';
 import SaveIcon from './SvgIcons/SaveIcon';
-import { API_BASE_URL } from '../api';
+import { processImages } from '../utils/imageHelpers';
 
 function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
     const [name, setName] = useState('');
@@ -20,15 +19,8 @@ function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
             setLat(point.lat ? String(point.lat) : '');
             setLon(point.lon ? String(point.lon) : '');
 
-            // Обработка изображений
-            const processedImages = (point.images || []).map(img => {
-                if (typeof img === 'string') return img;
-                if (typeof img === 'object' && img !== null && img.image) {
-                    return `${API_BASE_URL}${img.image}`;
-                }
-                return null;
-            }).filter(Boolean);
-
+            // Используем централизованную обработку изображений
+            const processedImages = processImages(point.images || []);
             setImages(processedImages);
         } else if (tempCoords) {
             setLat(tempCoords[0].toFixed(6));
@@ -54,6 +46,13 @@ function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
         const errors = [];
 
         for (const file of filesToProcess) {
+            // Проверка формата
+            if (!checkLimits.isImageFormatValid(file.name)) {
+                errors.push(`${file.name}: ${LIMIT_MESSAGES.INVALID_IMAGE_FORMAT}`);
+                continue;
+            }
+
+            // Проверка размера
             if (!checkLimits.isImageSizeValid(file.size)) {
                 errors.push(`${file.name}: ${LIMIT_MESSAGES.MAX_IMAGE_SIZE}`);
                 continue;
@@ -190,20 +189,30 @@ function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
                 </div>
             )}
 
-            {/* КНОПКА ЗАГРУЗКИ */}
+            {/* КНОПКА ЗАГРУЗКИ С ПРЕДУПРЕЖДЕНИЕМ */}
             {images.length < LIMITS.MAX_IMAGES_PER_POINT && (
-                <button
-                    className="form-upload-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                >
-                    Загрузить изображения ({images.length}/{LIMITS.MAX_IMAGES_PER_POINT})
-                </button>
+                <>
+                    <button
+                        className="form-upload-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        Загрузить изображения ({images.length}/{LIMITS.MAX_IMAGES_PER_POINT})
+                    </button>
+                    <div style={{
+                        fontSize: '10px',
+                        color: 'rgba(48, 55, 45, 0.60)',
+                        marginTop: '-8px',
+                        textAlign: 'center'
+                    }}>
+                        Форматы: JPG, PNG, GIF, WEBP, BMP. Макс. размер: {LIMITS.MAX_IMAGE_SIZE_MB} МБ
+                    </div>
+                </>
             )}
 
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                 multiple
                 style={{ display: 'none' }}
                 onChange={handleImageUpload}

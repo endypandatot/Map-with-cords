@@ -1,8 +1,7 @@
-// src/App.js
 import React, { createContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import './style.css';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { routeApi, API_BASE_URL } from './api';
+import { routeApi } from './api';
+import { processRoutes } from './utils/imageHelpers';
 import { LIMITS, LIMIT_MESSAGES, checkLimits } from './constants/limits';
 import RoutesList from './components/RoutesList';
 import RouteCreationForm from './components/RouteCreationForm';
@@ -35,25 +34,38 @@ const initialState = {
 
 function appReducer(state, action) {
     switch (action.type) {
-        case 'SET_LOADING': return { ...state, isLoading: action.payload };
-        case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false };
-        case 'FETCH_ROUTES_SUCCESS': return { ...state, routes: action.payload, isLoading: false, error: null };
-        case 'SET_UI_MODE': return { ...state, uiMode: action.payload };
+        case 'SET_LOADING':
+            return { ...state, isLoading: action.payload };
+        case 'SET_ERROR':
+            return { ...state, error: action.payload, isLoading: false };
+        case 'FETCH_ROUTES_SUCCESS':
+            return { ...state, routes: action.payload, isLoading: false, error: null };
+        case 'SET_UI_MODE':
+            return { ...state, uiMode: action.payload };
         case 'SET_CURRENT_ROUTE':
             console.log('🚀 SET_CURRENT_ROUTE called with:', action.payload);
             return { ...state, currentRoute: action.payload };
-        case 'CLEAR_CURRENT_ROUTE': return { ...state, currentRoute: null, pointToEdit: null, tempPointCoords: null, quickCreateMode: false };
-        case 'SET_PREVIEW_ROUTE': return { ...state, previewRoute: action.payload };
-        case 'CLEAR_PREVIEW_ROUTE': return { ...state, previewRoute: null };
-        case 'SET_POINT_TO_EDIT': return { ...state, pointToEdit: action.payload };
-        case 'CLEAR_POINT_TO_EDIT': return { ...state, pointToEdit: null, tempPointCoords: null, waitingForCoordinates: false };
-        case 'SET_TEMP_POINT_COORDS': return { ...state, tempPointCoords: action.payload };
-        case 'SET_WAITING_FOR_COORDINATES': return { ...state, waitingForCoordinates: action.payload };
-        case 'SET_QUICK_CREATE_MODE': return { ...state, quickCreateMode: action.payload };
+        case 'CLEAR_CURRENT_ROUTE':
+            return { ...state, currentRoute: null, pointToEdit: null, tempPointCoords: null, quickCreateMode: false };
+        case 'SET_PREVIEW_ROUTE':
+            return { ...state, previewRoute: action.payload };
+        case 'CLEAR_PREVIEW_ROUTE':
+            return { ...state, previewRoute: null };
+        case 'SET_POINT_TO_EDIT':
+            return { ...state, pointToEdit: action.payload };
+        case 'CLEAR_POINT_TO_EDIT':
+            return { ...state, pointToEdit: null, tempPointCoords: null, waitingForCoordinates: false };
+        case 'SET_TEMP_POINT_COORDS':
+            return { ...state, tempPointCoords: action.payload };
+        case 'SET_WAITING_FOR_COORDINATES':
+            return { ...state, waitingForCoordinates: action.payload };
+        case 'SET_QUICK_CREATE_MODE':
+            return { ...state, quickCreateMode: action.payload };
         case 'UPDATE_CURRENT_ROUTE_POINTS':
             if (!state.currentRoute) return state;
             return { ...state, currentRoute: { ...state.currentRoute, points: action.payload } };
-        default: return state;
+        default:
+            return state;
     }
 }
 
@@ -72,104 +84,35 @@ function App() {
                 id: p.id,
                 name: p.name,
                 lat: p.lat,
-                lon: p.lon,
-                coordinates: `${p.lat}, ${p.lon}`
+                lon: p.lon
             })) || []
         });
     }, [currentRoute]);
-
-    const debugLogImages = useCallback((routesData, stage) => {
-        console.log(`=== DEBUG ${stage} ===`);
-        routesData.forEach((route, routeIndex) => {
-            console.log(`Route ${routeIndex}:`, route.name);
-            if (route.points && route.points.length > 0) {
-                console.log(`  Route ${routeIndex} has ${route.points.length} points:`);
-                route.points.forEach((point, pointIndex) => {
-                    console.log(`    Point ${pointIndex}:`, {
-                        id: point.id,
-                        name: point.name,
-                        lat: point.lat,
-                        lon: point.lon,
-                        latType: typeof point.lat,
-                        lonType: typeof point.lon,
-                        description: point.description,
-                        imagesCount: point.images?.length || 0
-                    });
-                    if (point.images && point.images.length > 0) {
-                        console.log(`    Point ${pointIndex} (${point.name}) images:`, point.images);
-                        point.images.forEach((img, imgIndex) => {
-                            console.log(`      Image ${imgIndex}:`, {
-                                type: typeof img,
-                                value: img,
-                                isString: typeof img === 'string',
-                                isObject: typeof img === 'object',
-                                hasImageField: img && img.image
-                            });
-                        });
-                    }
-                });
-            } else {
-                console.log(`  Route ${routeIndex} has no points`);
-            }
-        });
-        console.log('=== END DEBUG ===');
-    }, []);
-
-    const processRoutesFromServer = useCallback((routesData) => {
-        if (!routesData) return [];
-        debugLogImages(routesData, 'RAW SERVER DATA');
-        const processedRoutes = routesData.map(route => ({
-            ...route,
-            points: route.points.map(point => ({
-                ...point,
-                images: (point.images || []).map(img => {
-                    console.log('Processing image:', img);
-                    if (typeof img === 'string' && (img.startsWith('http') || img.startsWith('data:'))) {
-                        console.log('Image is ready URL:', img);
-                        return img;
-                    }
-                    if (typeof img === 'object' && img !== null && img.image) {
-                        const fullUrl = img.image.startsWith('http')
-                            ? img.image
-                            : `${API_BASE_URL}${img.image}`;
-                        console.log('Built URL from object:', fullUrl);
-                        return fullUrl;
-                    }
-                    if (typeof img === 'string' && img.startsWith('/')) {
-                        const fullUrl = `${API_BASE_URL}${img}`;
-                        console.log('Built URL from relative path:', fullUrl);
-                        return fullUrl;
-                    }
-                    console.warn('Unknown image format:', img);
-                    return null;
-                }).filter(Boolean)
-            }))
-        }));
-        debugLogImages(processedRoutes, 'PROCESSED DATA');
-        return processedRoutes;
-    }, [debugLogImages]);
 
     useEffect(() => {
         const fetchRoutes = async () => {
             dispatch({ type: 'SET_LOADING', payload: true });
             try {
                 console.log('📡 Fetching routes from API...');
-                const response = await routeApi.getRoutes();
-                console.log('📦 Raw API response:', response.data);
 
+                const response = await routeApi.getRoutes();
+                console.log('📦 Raw API response:', response);
+
+                // response уже является массивом данных (не response.data)
                 let routesData;
-                if (response.data.results && Array.isArray(response.data.results)) {
+                if (response && response.results && Array.isArray(response.results)) {
                     console.log('📊 Paginated response detected');
-                    routesData = response.data.results;
-                } else if (Array.isArray(response.data)) {
+                    routesData = response.results;
+                } else if (Array.isArray(response)) {
                     console.log('📊 Array response detected');
-                    routesData = response.data;
+                    routesData = response;
                 } else {
-                    console.error('❌ Unexpected response format:', response.data);
+                    console.error('❌ Unexpected response format:', response);
                     routesData = [];
                 }
 
-                const processedData = processRoutesFromServer(routesData);
+                const processedData = processRoutes(routesData);
+                console.log('✅ Processed routes:', processedData);
                 dispatch({ type: 'FETCH_ROUTES_SUCCESS', payload: processedData });
             } catch (err) {
                 console.error('❌ Ошибка загрузки маршрутов:', err);
@@ -179,7 +122,7 @@ function App() {
             }
         };
         fetchRoutes();
-    }, [processRoutesFromServer]);
+    }, []);
 
     const showMainList = useCallback(() => {
         dispatch({ type: 'SET_UI_MODE', payload: UI_MODE.MAIN_LIST });
@@ -302,12 +245,14 @@ function App() {
                 })
             };
             console.log('Data to send to server:', dataToSend);
+
             const isExisting = typeof routeData.id === 'number';
-            const response = isExisting
+            const savedRoute = isExisting
                 ? await routeApi.updateRoute(routeData.id, dataToSend)
                 : await routeApi.createRoute(dataToSend);
-            console.log('Route save response:', response.data);
-            const savedRoute = response.data;
+
+            console.log('Route save response:', savedRoute);
+
             if (imagesToUploadByPoint.length > 0) {
                 console.log('Uploading images for points:', imagesToUploadByPoint);
                 const uploadPromises = imagesToUploadByPoint.map(({ pointIndex, images }) => {
@@ -318,13 +263,13 @@ function App() {
                     }
                     return Promise.resolve();
                 });
-                const uploadResults = await Promise.all(uploadPromises);
-                console.log('Image upload results:', uploadResults);
+                await Promise.all(uploadPromises);
             }
+
             console.log('Reloading all routes after save...');
-            const finalRoutesResponse = await routeApi.getRoutes();
-            console.log('Final routes response:', finalRoutesResponse.data);
-            const processedFinalData = processRoutesFromServer(finalRoutesResponse.data);
+            // ИСПРАВЛЕНО: getRoutes() возвращает массив напрямую
+            const finalRoutesData = await routeApi.getRoutes();
+            const processedFinalData = processRoutes(Array.isArray(finalRoutesData) ? finalRoutesData : []);
             dispatch({ type: 'FETCH_ROUTES_SUCCESS', payload: processedFinalData });
             showMainList();
         } catch (err) {
@@ -334,7 +279,7 @@ function App() {
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [showMainList, processRoutesFromServer]);
+    }, [showMainList]);
 
     const handleDeleteRoute = useCallback(async (routeId) => {
         if (window.confirm('Вы уверены, что хотите удалить этот маршрут?')) {
@@ -536,25 +481,23 @@ function App() {
             waitingForCoordinates,
             startViewRoute,
         }}>
-            <Router>
-                <div className="main-container">
-                    <div className="routes-container">
-                        {renderSidebarContent()}
-                    </div>
-                    <div className="map-container">
-                        <YandexMap
-                            currentRoute={currentRoute}
-                            previewRoute={previewRoute}
-                            tempPointCoords={tempPointCoords}
-                            uiMode={uiMode}
-                            onMapClick={handleMapClickForPointCreation}
-                            pointToEdit={pointToEdit}
-                            onEditPoint={startEditPoint}
-                            waitingForCoordinates={waitingForCoordinates}
-                        />
-                    </div>
+            <div className="main-container">
+                <div className="routes-container">
+                    {renderSidebarContent()}
                 </div>
-            </Router>
+                <div className="map-container">
+                    <YandexMap
+                        currentRoute={currentRoute}
+                        previewRoute={previewRoute}
+                        tempPointCoords={tempPointCoords}
+                        uiMode={uiMode}
+                        onMapClick={handleMapClickForPointCreation}
+                        pointToEdit={pointToEdit}
+                        onEditPoint={startEditPoint}
+                        waitingForCoordinates={waitingForCoordinates}
+                    />
+                </div>
+            </div>
         </RouteContext.Provider>
     );
 }

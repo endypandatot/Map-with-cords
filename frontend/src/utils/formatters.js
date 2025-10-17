@@ -1,4 +1,3 @@
-// src/utils/formatters.js
 
 export const parseDecimalCoordinate = (value) => {
     if (typeof value !== 'string' || value.trim() === '') return '';
@@ -8,7 +7,6 @@ export const parseDecimalCoordinate = (value) => {
 
     if (!decimalRegex.test(trimmed)) return '';
 
-    // ИСПРАВЛЕНО: Ограничиваем до 6 знаков после запятой
     if (trimmed.includes('.')) {
         const parts = trimmed.split('.');
         if (parts[1] && parts[1].length > 6) {

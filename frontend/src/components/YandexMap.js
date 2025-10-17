@@ -1,8 +1,8 @@
-// src/components/YandexMap.js
+
 import React, { useEffect, useRef, useState } from 'react';
 import { UI_MODE } from '../constants/uiModes';
 import { decimalToDMS } from '../utils/formatters';
-import { isValidImageURL } from '../utils/imageHelpers';
+import { processImages } from '../utils/imageHelpers';
 
 const createSafePlacemarkHintLayout = (ymaps) => {
     try {
@@ -56,7 +56,7 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                 renderImages: function(container, images) {
                     if (!Array.isArray(images) || images.length === 0) return;
 
-                    const validImages = images.filter(isValidImageURL);
+                    const validImages = images.filter(img => img && typeof img === 'string' && img.trim() !== '');
                     if (validImages.length === 0) return;
 
                     const imagesDiv = document.createElement('div');
@@ -78,6 +78,10 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             img.src = imageUrl;
                             img.alt = '';
                             img.loading = 'lazy';
+                            img.onerror = function() {
+                                console.error('Failed to load image:', imageUrl);
+                                this.style.display = 'none';
+                            };
 
                             const countDiv = document.createElement('div');
                             countDiv.className = 'figma-hint-image-count';
@@ -92,6 +96,10 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             img.src = imageUrl;
                             img.alt = '';
                             img.loading = 'lazy';
+                            img.onerror = function() {
+                                console.error('Failed to load image:', imageUrl);
+                                this.style.display = 'none';
+                            };
                             imagesDiv.appendChild(img);
                         }
                     });
@@ -208,13 +216,81 @@ const createSafePlacemarkHintLayout = (ymaps) => {
     }
 };
 
-const processImagesForHint = (images) => {
+const safeSetBounds = (map, points) => {
     try {
-        if (!Array.isArray(images) || images.length === 0) return [];
-        return images.filter(img => typeof img === 'string' && img.trim() !== '').filter(isValidImageURL);
+        console.log('🔍 safeSetBounds called with points:', points);
+
+        if (!points || points.length === 0) {
+            console.warn('⚠️ No points to set bounds');
+            return;
+        }
+
+        // Извлекаем координаты
+        const coords = [];
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            const lat = point.latParsed;
+            const lon = point.lonParsed;
+
+            if (typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon) && isFinite(lat) && isFinite(lon)) {
+                coords.push([lat, lon]);
+                console.log(`   ✅ Valid coordinates: [${lat}, ${lon}]`);
+            } else {
+                console.warn(`   ⚠️ Invalid coordinates for point ${i}:`, { lat, lon });
+            }
+        }
+
+        if (coords.length === 0) {
+            console.warn('⚠️ No valid coordinates for setBounds');
+            return;
+        }
+
+        // ИСПРАВЛЕНО: если только одна точка, центрируем карту вместо setBounds
+        if (coords.length === 1) {
+            console.log('📍 Only one point, centering map instead of setBounds');
+            console.log('   Centering on:', coords[0]);
+            map.setCenter(coords[0], 14);
+            console.log('✅ Map centered successfully');
+            return;
+        }
+
+        console.log('🗺️ Multiple points, using setBounds');
+        console.log('   Coordinates array:', coords);
+
+        // Проверка структуры координат
+        for (let i = 0; i < coords.length; i++) {
+            const coord = coords[i];
+            if (!Array.isArray(coord) || coord.length !== 2) {
+                console.error(`❌ Invalid coordinate structure at index ${i}:`, coord);
+                return;
+            }
+            if (typeof coord[0] !== 'number' || typeof coord[1] !== 'number') {
+                console.error(`❌ Invalid coordinate types at index ${i}:`, coord);
+                return;
+            }
+            if (isNaN(coord[0]) || isNaN(coord[1]) || !isFinite(coord[0]) || !isFinite(coord[1])) {
+                console.error(`❌ Invalid coordinate values at index ${i}:`, coord);
+                return;
+            }
+        }
+
+        console.log('✅ All coordinates valid, calling map.setBounds()');
+
+        try {
+            map.setBounds(coords, { checkZoomRange: true, zoomMargin: 40 });
+            console.log('✅ setBounds completed successfully');
+        } catch (boundsError) {
+            console.error('❌ Error calling map.setBounds():', boundsError);
+            console.error('Coordinates that caused error:', coords);
+            // Fallback: центрируем карту на первой точке
+            if (coords.length > 0) {
+                console.log('🔄 Fallback: centering on first point');
+                map.setCenter(coords[0], 10);
+            }
+        }
     } catch (error) {
-        console.error('Error processing images:', error);
-        return [];
+        console.error('❌ Error in safeSetBounds:', error);
+        console.error('Error stack:', error.stack);
     }
 };
 
@@ -230,7 +306,6 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
             if (window.ymaps) {
                 setApiLoaded(true);
             } else {
-                // Если API еще не загружен, проверяем через 100мс
                 setTimeout(checkYmapsLoaded, 100);
             }
         };
@@ -311,7 +386,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
             const createSafePlacemarkData = (point) => {
                 let processedImages = [];
                 if (Array.isArray(point.images)) {
-                    processedImages = processImagesForHint(point.images);
+                    processedImages = processImages(point.images);
                 }
 
                 return {
@@ -362,7 +437,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                         map.geoObjects.add(polyline);
                     }
 
-                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
+                    safeSetBounds(map, validPoints);
                 }
             }
 
@@ -406,7 +481,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                         map.geoObjects.add(polyline);
                     }
 
-                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
+                    safeSetBounds(map, validPoints);
                 }
             }
 
@@ -455,7 +530,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                         map.geoObjects.add(polyline);
                     }
 
-                    map.setBounds(validPoints.map(p => [p.latParsed, p.lonParsed]), { checkZoomRange: true, zoomMargin: 40 });
+                    safeSetBounds(map, validPoints);
                 }
             }
 
@@ -469,6 +544,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 });
 
                 map.geoObjects.add(tempPlacemark);
+                map.setCenter(tempPointCoords, 14);
             }
         } catch (error) {
             console.error('Error updating map:', error);
