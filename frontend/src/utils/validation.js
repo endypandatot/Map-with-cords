@@ -1,5 +1,3 @@
-// src/utils/validation.js
-
 /**
  * Валидация координат (широты и долготы)
  * @param {string|number} lat - Широта

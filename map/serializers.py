@@ -1,4 +1,4 @@
-# map/serializers.py
+# map/serializers.ъ
 from rest_framework import serializers
 from django.db import transaction
 from decimal import Decimal, InvalidOperation

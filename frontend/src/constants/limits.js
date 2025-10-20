@@ -1,4 +1,3 @@
-
 export const LIMITS = {
     MAX_ROUTES: 5,
     MAX_POINTS_PER_ROUTE: 20,

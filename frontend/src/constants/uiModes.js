@@ -1,4 +1,3 @@
-
 export const UI_MODE = {
     MAIN_LIST: 'MAIN_LIST',
     CREATE_ROUTE: 'CREATE_ROUTE',

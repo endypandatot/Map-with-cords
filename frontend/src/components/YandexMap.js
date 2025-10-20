@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { UI_MODE } from '../constants/uiModes';
 import { decimalToDMS } from '../utils/formatters';
@@ -9,20 +8,20 @@ const createSafePlacemarkHintLayout = (ymaps) => {
         return ymaps.templateLayoutFactory.createClass(
             '<div class="figma-hint">' +
                 '<div class="figma-hint-main">' +
-                    '<div class="figma-hint-title">$[properties.safeData.name]</div>' +
-                    '<div class="figma-hint-description">$[properties.safeData.description]</div>' +
+                    '<div class="figma-hint-title">$[properties.hintData.name]</div>' +
+                    '<div class="figma-hint-description">$[properties.hintData.description]</div>' +
                     '<div class="figma-hint-coordinates">' +
                         '<div class="figma-coord-item">' +
                             '<span class="figma-coord-label">Широта</span>' +
-                            '<span class="figma-coord-value">$[properties.safeData.lat]</span>' +
+                            '<span class="figma-coord-value">$[properties.hintData.lat]</span>' +
                         '</div>' +
                         '<div class="figma-coord-item">' +
                             '<span class="figma-coord-label">Долгота</span>' +
-                            '<span class="figma-coord-value">$[properties.safeData.lon]</span>' +
+                            '<span class="figma-coord-value">$[properties.hintData.lon]</span>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
-                '<div id="hint-images-container"></div>' +
+                '<div id="hint-images-container-$[properties.hintData.uniqueId]"></div>' +
             '</div>',
             {
                 build: function () {
@@ -32,14 +31,45 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                         }
                         this.injectStyles();
 
-                        const data = this.getData();
-                        const imagesContainer = this.getElement().querySelector('#hint-images-container');
+                        const properties = this.getData().properties;
+                        console.log('🏗️ Building hint with properties:', properties);
 
-                        if (imagesContainer && data.safeData && data.safeData.images) {
-                            this.renderImages(imagesContainer, data.safeData.images);
+                        if (!properties) {
+                            console.error('❌ No properties in hint data');
+                            return;
+                        }
+
+                        const hintData = properties.get('hintData');
+                        console.log('📦 Hint data:', hintData);
+
+                        if (!hintData) {
+                            console.error('❌ No hintData in properties');
+                            return;
+                        }
+
+                        const uniqueId = hintData.uniqueId || 'default';
+                        const imagesContainer = this.getElement().querySelector(`#hint-images-container-${uniqueId}`);
+
+                        if (!imagesContainer) {
+                            console.error('❌ Images container not found for ID:', uniqueId);
+                            return;
+                        }
+
+                        const images = hintData.images;
+                        console.log('📸 Images from hintData:', images);
+
+                        if (images && Array.isArray(images) && images.length > 0) {
+                            console.log('✅ Rendering images:', images);
+                            this.renderImages(imagesContainer, images);
+                        } else {
+                            console.warn('⚠️ No images to render:', {
+                                hasImages: !!images,
+                                isArray: Array.isArray(images),
+                                length: images?.length
+                            });
                         }
                     } catch (error) {
-                        console.error('Error in hint build:', error);
+                        console.error('❌ Error in hint build:', error);
                     }
                 },
 
@@ -54,10 +84,27 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                 },
 
                 renderImages: function(container, images) {
-                    if (!Array.isArray(images) || images.length === 0) return;
+                    console.log('🖼️ renderImages called with:', images);
 
-                    const validImages = images.filter(img => img && typeof img === 'string' && img.trim() !== '');
-                    if (validImages.length === 0) return;
+                    if (!Array.isArray(images) || images.length === 0) {
+                        console.warn('⚠️ No images to render');
+                        return;
+                    }
+
+                    const validImages = images.filter(img => {
+                        const isValid = img && typeof img === 'string' && img.trim() !== '';
+                        if (!isValid) {
+                            console.warn('⚠️ Invalid image:', img);
+                        }
+                        return isValid;
+                    });
+
+                    console.log('✅ Valid images:', validImages);
+
+                    if (validImages.length === 0) {
+                        console.warn('⚠️ No valid images after filtering');
+                        return;
+                    }
 
                     const imagesDiv = document.createElement('div');
                     imagesDiv.className = 'figma-hint-images';
@@ -65,9 +112,13 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                     const imagesToShow = validImages.slice(0, 3);
                     const remainingCount = Math.max(0, validImages.length - 3);
 
+                    console.log(`📊 Showing ${imagesToShow.length} images, ${remainingCount} remaining`);
+
                     imagesToShow.forEach((imageUrl, index) => {
                         const isLast = index === imagesToShow.length - 1;
                         const hasOverlay = isLast && remainingCount > 0;
+
+                        console.log(`   Image ${index + 1}: ${imageUrl.substring(0, 80)}...`);
 
                         if (hasOverlay) {
                             const overlayDiv = document.createElement('div');
@@ -79,8 +130,11 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             img.alt = '';
                             img.loading = 'lazy';
                             img.onerror = function() {
-                                console.error('Failed to load image:', imageUrl);
+                                console.error('❌ Failed to load image:', imageUrl);
                                 this.style.display = 'none';
+                            };
+                            img.onload = function() {
+                                console.log('✅ Image loaded successfully');
                             };
 
                             const countDiv = document.createElement('div');
@@ -97,14 +151,18 @@ const createSafePlacemarkHintLayout = (ymaps) => {
                             img.alt = '';
                             img.loading = 'lazy';
                             img.onerror = function() {
-                                console.error('Failed to load image:', imageUrl);
+                                console.error('❌ Failed to load image:', imageUrl);
                                 this.style.display = 'none';
+                            };
+                            img.onload = function() {
+                                console.log('✅ Image loaded successfully');
                             };
                             imagesDiv.appendChild(img);
                         }
                     });
 
                     container.appendChild(imagesDiv);
+                    console.log('✅ Images container appended to hint');
                 },
 
                 injectStyles: function() {
@@ -225,7 +283,6 @@ const safeSetBounds = (map, points) => {
             return;
         }
 
-        // Извлекаем координаты
         const coords = [];
         for (let i = 0; i < points.length; i++) {
             const point = points[i];
@@ -245,52 +302,23 @@ const safeSetBounds = (map, points) => {
             return;
         }
 
-        // ИСПРАВЛЕНО: если только одна точка, центрируем карту вместо setBounds
         if (coords.length === 1) {
             console.log('📍 Only one point, centering map instead of setBounds');
-            console.log('   Centering on:', coords[0]);
             map.setCenter(coords[0], 14);
-            console.log('✅ Map centered successfully');
             return;
         }
-
-        console.log('🗺️ Multiple points, using setBounds');
-        console.log('   Coordinates array:', coords);
-
-        // Проверка структуры координат
-        for (let i = 0; i < coords.length; i++) {
-            const coord = coords[i];
-            if (!Array.isArray(coord) || coord.length !== 2) {
-                console.error(`❌ Invalid coordinate structure at index ${i}:`, coord);
-                return;
-            }
-            if (typeof coord[0] !== 'number' || typeof coord[1] !== 'number') {
-                console.error(`❌ Invalid coordinate types at index ${i}:`, coord);
-                return;
-            }
-            if (isNaN(coord[0]) || isNaN(coord[1]) || !isFinite(coord[0]) || !isFinite(coord[1])) {
-                console.error(`❌ Invalid coordinate values at index ${i}:`, coord);
-                return;
-            }
-        }
-
-        console.log('✅ All coordinates valid, calling map.setBounds()');
 
         try {
             map.setBounds(coords, { checkZoomRange: true, zoomMargin: 40 });
             console.log('✅ setBounds completed successfully');
         } catch (boundsError) {
             console.error('❌ Error calling map.setBounds():', boundsError);
-            console.error('Coordinates that caused error:', coords);
-            // Fallback: центрируем карту на первой точке
             if (coords.length > 0) {
-                console.log('🔄 Fallback: centering on first point');
                 map.setCenter(coords[0], 10);
             }
         }
     } catch (error) {
         console.error('❌ Error in safeSetBounds:', error);
-        console.error('Error stack:', error.stack);
     }
 };
 
@@ -300,7 +328,6 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
     const [mapReady, setMapReady] = useState(false);
     const [apiLoaded, setApiLoaded] = useState(false);
 
-    // Проверяем загрузку Yandex Maps API
     useEffect(() => {
         const checkYmapsLoaded = () => {
             if (window.ymaps) {
@@ -383,23 +410,39 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 console.error('Error creating SafeHintLayout:', error);
             }
 
-            const createSafePlacemarkData = (point) => {
+            const createHintData = (point, index) => {
+                console.log('📋 Creating hint data for point:', point);
+
                 let processedImages = [];
                 if (Array.isArray(point.images)) {
+                    console.log('   Processing images:', point.images);
                     processedImages = processImages(point.images);
+                    console.log('   Processed images result:', processedImages);
+                } else {
+                    console.warn('   ⚠️ Point images is not an array:', point.images);
                 }
 
-                return {
+                const hintData = {
                     name: (point.name || 'Без названия').toString().replace(/[<>&"']/g, ''),
                     description: (point.description || 'Без описания').toString().replace(/[<>&"']/g, ''),
                     lat: decimalToDMS(point.latParsed || parseFloat(point.lat)),
                     lon: decimalToDMS(point.lonParsed || parseFloat(point.lon)),
-                    images: processedImages
+                    images: processedImages,
+                    uniqueId: `point-${index}-${Date.now()}`
                 };
+
+                console.log('✅ Hint data created:', {
+                    name: hintData.name,
+                    imagesCount: hintData.images.length,
+                    uniqueId: hintData.uniqueId
+                });
+
+                return hintData;
             };
 
-            // PREVIEW MODE
             if (uiMode === UI_MODE.MAIN_LIST && previewRoute && previewRoute.points && previewRoute.points.length > 0) {
+                console.log('👁️ PREVIEW MODE:', previewRoute.name);
+
                 const validPoints = previewRoute.points
                     .map(point => {
                         const lat = parseFloat(point.lat);
@@ -411,7 +454,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 if (validPoints.length > 0) {
                     validPoints.forEach((point, index) => {
                         const coords = [point.latParsed, point.lonParsed];
-                        const safeData = createSafePlacemarkData(point);
+                        const hintData = createHintData(point, index);
 
                         const placemarkOptions = {
                             preset: 'islands#redDotIcon',
@@ -424,7 +467,12 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                             placemarkOptions.hintOffset = [15, 15];
                         }
 
-                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
+                        const placemark = new ymaps.Placemark(
+                            coords,
+                            { hintData: hintData },
+                            placemarkOptions
+                        );
+
                         map.geoObjects.add(placemark);
                     });
 
@@ -441,8 +489,9 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 }
             }
 
-            // VIEW_ROUTE_DETAILS MODE
             else if (uiMode === UI_MODE.VIEW_ROUTE_DETAILS && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
+                console.log('👁️ VIEW_ROUTE_DETAILS MODE:', currentRoute.name);
+
                 const validPoints = currentRoute.points
                     .map(point => {
                         const lat = parseFloat(point.lat);
@@ -454,7 +503,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 if (validPoints.length > 0) {
                     validPoints.forEach((point, index) => {
                         const coords = [point.latParsed, point.lonParsed];
-                        const safeData = createSafePlacemarkData(point);
+                        const hintData = createHintData(point, index);
 
                         const placemarkOptions = {
                             preset: 'islands#blueDotIcon',
@@ -468,7 +517,12 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                             placemarkOptions.hintOffset = [15, 15];
                         }
 
-                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
+                        const placemark = new ymaps.Placemark(
+                            coords,
+                            { hintData: hintData },
+                            placemarkOptions
+                        );
+
                         map.geoObjects.add(placemark);
                     });
 
@@ -485,8 +539,9 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 }
             }
 
-            // CREATE/EDIT ROUTE MODE
             else if ((uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE) && currentRoute && currentRoute.points && currentRoute.points.length > 0) {
+                console.log('✏️ CREATE/EDIT ROUTE MODE:', currentRoute.name);
+
                 const validPoints = currentRoute.points
                     .map(point => {
                         const lat = parseFloat(point.lat);
@@ -498,7 +553,7 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 if (validPoints.length > 0) {
                     validPoints.forEach((point, index) => {
                         const coords = [point.latParsed, point.lonParsed];
-                        const safeData = createSafePlacemarkData(point);
+                        const hintData = createHintData(point, index);
 
                         const placemarkOptions = {
                             preset: 'islands#greenDotIcon',
@@ -511,7 +566,11 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                             placemarkOptions.hintOffset = [15, 15];
                         }
 
-                        const placemark = new ymaps.Placemark(coords, { safeData }, placemarkOptions);
+                        const placemark = new ymaps.Placemark(
+                            coords,
+                            { hintData: hintData },
+                            placemarkOptions
+                        );
 
                         placemark.events.add('click', (e) => {
                             e.stopPropagation();
@@ -534,8 +593,9 @@ function YandexMap({ currentRoute, previewRoute, tempPointCoords, uiMode, onMapC
                 }
             }
 
-            // TEMP POINT MODE
             else if (tempPointCoords && (uiMode === UI_MODE.CREATE_ROUTE || uiMode === UI_MODE.EDIT_ROUTE)) {
+                console.log('📍 TEMP POINT MODE');
+
                 const tempPlacemark = new ymaps.Placemark(tempPointCoords, {
                     hintContent: 'Новая точка'
                 }, {
