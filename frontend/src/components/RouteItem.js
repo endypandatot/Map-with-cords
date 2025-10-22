@@ -1,6 +1,6 @@
-import React, { useState, useContext } from 'react';
-import { RouteContext } from '../App';
-import { API_BASE_URL } from '../api';
+import React, { useState, useContext, useMemo } from 'react';
+import { RouteContext } from '../contexts/RouteContext';
+import { processImages } from '../utils/imageHelpers';
 import EditIcon from './SvgIcons/EditIcon';
 import DeleteIcon from './SvgIcons/DeleteIcon';
 import PhotoIcon from './SvgIcons/PhotoIcon';
@@ -10,20 +10,22 @@ const RouteItem = ({ route, onMouseEnter, onMouseLeave }) => {
     const { startEditRoute, handleDeleteRoute, startViewRoute } = useContext(RouteContext);
     const [showPoints, setShowPoints] = useState(false);
 
-    // Обработка изображений
-    const processedPoints = route.points?.map(point => ({
-        ...point,
-        images: (point.images || []).map(img => {
-            if (typeof img === 'string') return img;
-            if (typeof img === 'object' && img !== null && img.image) {
-                return `${API_BASE_URL}${img.image}`;
-            }
-            return null;
-        }).filter(Boolean)
-    })) || [];
+    // Обработка изображений для всех точек
+    const processedPoints = useMemo(() => {
+        console.log('🖼️ RouteItem processing points for route:', route.name);
+        return (route.points || []).map(point => {
+            console.log('   Processing point:', point.name, 'with images:', point.images);
+            const processed = processImages(point.images || []);
+            console.log('   Processed images:', processed);
+            return {
+                ...point,
+                processedImages: processed
+            };
+        });
+    }, [route.points, route.name]);
 
     // Проверяем есть ли хоть одно изображение в маршруте
-    const hasAnyImages = processedPoints.some(point => point.images && point.images.length > 0);
+    const hasAnyImages = processedPoints.some(point => point.processedImages && point.processedImages.length > 0);
 
     const handleEdit = (e) => {
         e.stopPropagation();
@@ -97,15 +99,23 @@ const RouteItem = ({ route, onMouseEnter, onMouseLeave }) => {
                             </div>
                             <div className="route-point-content">
                                 <div className="route-point-name">{point.name || 'Без названия'}</div>
-                                {point.images && point.images.length > 0 && (
+                                {point.processedImages && point.processedImages.length > 0 && (
                                     <div className="route-point-images-inline">
                                         <div className="image-container">
-                                            {point.images.slice(0, 3).map((src, idx) => (
-                                                <img key={idx} src={src} alt="" />
+                                            {point.processedImages.slice(0, 3).map((src, idx) => (
+                                                <img
+                                                    key={idx}
+                                                    src={src}
+                                                    alt=""
+                                                    onError={(e) => {
+                                                        console.error('❌ Image load error:', src);
+                                                        e.target.style.display = 'none';
+                                                    }}
+                                                />
                                             ))}
                                         </div>
-                                        {point.images.length > 3 && (
-                                            <div className="image-count">+{point.images.length - 3}</div>
+                                        {point.processedImages.length > 3 && (
+                                            <div className="image-count">+{point.processedImages.length - 3}</div>
                                         )}
                                     </div>
                                 )}

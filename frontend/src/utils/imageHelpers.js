@@ -1,117 +1,89 @@
-import { API_BASE_URL } from '../api';
-
 /**
- * Обрабатывает массив изображений и возвращает корректные URL
- * @param {Array} images - массив изображений (могут быть строками, объектами или base64)
- * @returns {Array} - массив URL изображений
+ * Обработка изображений точки - унификация формата
+ * Преобразует различные форматы изображений в единый массив URL строк
+ *
+ * @param {Array} images - Массив изображений в различных форматах
+ * @returns {Array<string>} Массив URL строк изображений
  */
 export const processImages = (images) => {
     console.log('🖼️ processImages called with:', images);
 
-    if (!Array.isArray(images)) {
-        console.warn('⚠️ processImages: images is not an array', images);
+    if (!images || !Array.isArray(images)) {
+        console.warn('⚠️ processImages: invalid input, returning empty array');
         return [];
     }
 
-    const processed = images
-        .map((img, index) => {
-            console.log(`   Processing image ${index + 1}:`, img);
+    const processedImages = [];
 
-            // Если это уже строка (URL или base64)
-            if (typeof img === 'string') {
-                // Если это base64 - возвращаем как есть
-                if (img.startsWith('data:image')) {
-                    console.log(`   ✅ Image ${index + 1}: base64 data`);
-                    return img;
-                }
+    images.forEach((img, index) => {
+        console.log(`   Processing image ${index + 1}:`, img);
 
-                // Если это относительный путь, добавляем базовый URL
-                if (img.startsWith('/media/')) {
-                    const fullUrl = `${API_BASE_URL}${img}`;
-                    console.log(`   ✅ Image ${index + 1}: ${fullUrl}`);
-                    return fullUrl;
-                }
+        // Объект с полем image (из Django API)
+        if (img && typeof img === 'object' && img.image) {
+            let imageUrl = img.image;
 
-                // Если это уже полный URL
-                if (img.startsWith('http://') || img.startsWith('https://')) {
-                    console.log(`   ✅ Image ${index + 1}: full URL`);
-                    return img;
-                }
-
-                console.log(`   ✅ Image ${index + 1}: ${img}`);
-                return img;
+            // Если URL относительный, добавляем базовый URL
+            if (imageUrl.startsWith('/media/')) {
+                const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+                imageUrl = `${API_BASE_URL}${imageUrl}`;
             }
 
-            // Если это объект с полем image
-            if (typeof img === 'object' && img !== null) {
-                if (img.image) {
-                    const imagePath = img.image;
-
-                    // Если путь относительный, добавляем базовый URL
-                    if (typeof imagePath === 'string') {
-                        if (imagePath.startsWith('data:image')) {
-                            console.log(`   ✅ Image ${index + 1}: base64 from object`);
-                            return imagePath;
-                        }
-
-                        if (imagePath.startsWith('/media/')) {
-                            const fullUrl = `${API_BASE_URL}${imagePath}`;
-                            console.log(`   ✅ Image ${index + 1}: ${fullUrl}`);
-                            return fullUrl;
-                        }
-
-                        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-                            console.log(`   ✅ Image ${index + 1}: full URL from object`);
-                            return imagePath;
-                        }
-
-                        console.log(`   ✅ Image ${index + 1}: ${imagePath}`);
-                        return imagePath;
-                    }
-                }
+            console.log(`   ✅ Image ${index + 1}: URL from object - ${imageUrl}`);
+            processedImages.push(imageUrl);
+        }
+        // Строка - URL или Base64
+        else if (typeof img === 'string') {
+            if (img.startsWith('data:image/')) {
+                console.log(`   ✅ Image ${index + 1}: base64 data`);
+                processedImages.push(img);
+            } else if (img.startsWith('http://') || img.startsWith('https://')) {
+                console.log(`   ✅ Image ${index + 1}: full URL string`);
+                processedImages.push(img);
+            } else if (img.startsWith('/media/')) {
+                const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+                const fullUrl = `${API_BASE_URL}${img}`;
+                console.log(`   ✅ Image ${index + 1}: relative URL converted to ${fullUrl}`);
+                processedImages.push(fullUrl);
+            } else {
+                console.warn(`   ⚠️ Image ${index + 1}: unknown string format:`, img.substring(0, 50));
             }
+        }
+        // Неизвестный формат
+        else {
+            console.warn(`   ⚠️ Image ${index + 1}: unknown format, skipping`);
+        }
+    });
 
-            console.warn(`   ⚠️ Unknown image format at index ${index}:`, img);
-            return null;
-        })
-        .filter(Boolean);
-
-    console.log(`✅ processImages result: ${processed.length} valid images`);
-    return processed;
+    console.log('✅ processImages result:', processedImages.length, 'valid images');
+    return processedImages;
 };
 
 /**
- * Обрабатывает массив маршрутов и их точки с изображениями
- * @param {Array} routesData - массив маршрутов
- * @returns {Array} - обработанные маршруты
+ * Получить первое изображение из массива
+ * @param {Array} images - Массив изображений
+ * @returns {string|null} URL первого изображения или null
  */
-export const processRoutes = (routesData) => {
-    console.log('🗺️ processRoutes called with:', routesData);
+export const getFirstImage = (images) => {
+    const processed = processImages(images);
+    return processed.length > 0 ? processed[0] : null;
+};
 
-    if (!Array.isArray(routesData)) {
-        console.error('❌ processRoutes: data is not an array');
-        return [];
-    }
+/**
+ * Проверка, есть ли изображения
+ * @param {Array} images - Массив изображений
+ * @returns {boolean}
+ */
+export const hasImages = (images) => {
+    const processed = processImages(images);
+    return processed.length > 0;
+};
 
-    const processed = routesData.map((route, routeIndex) => {
-        console.log(`   Processing route ${routeIndex + 1}: ${route.name}`);
-
-        const processedPoints = (route.points || []).map((point, pointIndex) => {
-            console.log(`      Processing point ${pointIndex + 1}: ${point.name}`);
-            const processedImages = processImages(point.images || []);
-
-            return {
-                ...point,
-                images: processedImages
-            };
-        });
-
-        return {
-            ...route,
-            points: processedPoints
-        };
-    });
-
-    console.log(`✅ processRoutes result: ${processed.length} routes processed`);
-    return processed;
+/**
+ * Получить количество изображений
+ * @param {Array} images - Массив изображений
+ * @returns {number}
+ */
+export const getImagesCount = (images) => {
+    const processed = processImages(images);
+    return processed.length;
 };

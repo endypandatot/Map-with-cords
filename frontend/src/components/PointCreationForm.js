@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LIMITS, LIMIT_MESSAGES, checkLimits } from '../constants/limits';
+import { getAcceptString, getAllowedFormatsString } from '../constants/imageValidation';
 import CancelIcon from './SvgIcons/CancelIcon';
 import SaveIcon from './SvgIcons/SaveIcon';
 import { processImages } from '../utils/imageHelpers';
@@ -204,7 +205,7 @@ function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
                         marginTop: '-8px',
                         textAlign: 'center'
                     }}>
-                        Форматы: JPG, PNG, GIF, WEBP, BMP. Макс. размер: {LIMITS.MAX_IMAGE_SIZE_MB} МБ
+                        Форматы: {getAllowedFormatsString()}. Макс. размер: {LIMITS.MAX_IMAGE_SIZE_MB} МБ
                     </div>
                 </>
             )}
@@ -212,7 +213,7 @@ function PointCreationForm({ point, tempCoords, onSave, onCancel }) {
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
+                accept={getAcceptString()}
                 multiple
                 style={{ display: 'none' }}
                 onChange={handleImageUpload}

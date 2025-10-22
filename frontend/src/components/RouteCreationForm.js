@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import SaveIcon from './SvgIcons/SaveIcon';
 import CancelIcon from './SvgIcons/CancelIcon';
 import PointDeleteIcon from './SvgIcons/PointDeleteIcon';
 import PointsSectionItem from './PointsSectionItem';
 import CustomScrollbar from './CustomScrollbar';
-import { API_BASE_URL } from '../api';
+import { processImages } from '../utils/imageHelpers';
 import { LIMITS } from '../constants/limits';
 
 const FormRoutePointItem = React.memo(({ point, index, isViewMode, onEdit, onDelete, onDragStart, onDragOver, onDragLeave, onDrop, isDragging, dragOverPosition }) => {
@@ -15,13 +15,14 @@ const FormRoutePointItem = React.memo(({ point, index, isViewMode, onEdit, onDel
     const handleDrop = useCallback((e) => { if (!isViewMode && onDrop) { onDrop(e, index); } }, [isViewMode, onDrop, index]);
     const className = `route-point ${isDragging ? 'dragging' : ''} ${dragOverPosition ? `drag-over-${dragOverPosition}` : ''}`;
 
-    const processedImages = (point.images || []).map(img => {
-        if (typeof img === 'string') return img;
-        if (typeof img === 'object' && img !== null && img.image) {
-            return `${API_BASE_URL}${img.image}`;
-        }
-        return null;
-    }).filter(Boolean);
+    // Используем централизованную обработку изображений
+    const processedImages = useMemo(() => {
+        console.log('🖼️ FormRoutePointItem processing images for:', point.name);
+        console.log('🖼️ Raw images:', point.images);
+        const processed = processImages(point.images || []);
+        console.log('🖼️ Processed images:', processed);
+        return processed;
+    }, [point.images, point.name]);
 
     const visibleImages = processedImages.slice(0, 3);
     const remainingImagesCount = processedImages.length - visibleImages.length;
@@ -47,7 +48,15 @@ const FormRoutePointItem = React.memo(({ point, index, isViewMode, onEdit, onDel
                     <div className="route-point-images-inline">
                         <div className="image-container">
                             {visibleImages.map((src, idx) => (
-                                <img key={idx} src={src} alt="" />
+                                <img
+                                    key={idx}
+                                    src={src}
+                                    alt=""
+                                    onError={(e) => {
+                                        console.error('❌ Image load error:', src);
+                                        e.target.style.display = 'none';
+                                    }}
+                                />
                             ))}
                         </div>
                         {remainingImagesCount > 0 && (

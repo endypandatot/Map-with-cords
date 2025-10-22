@@ -1,181 +1,221 @@
-import { useState, useCallback } from 'react';
-import { routesApi } from '../api/routes';
-import { pointsApi } from '../api/points';
-import { processImages } from '../utils/imageHelpers';
+import { useCallback } from 'react';
+import { routesApi, pointsApi } from '../api';
 import { LIMITS, LIMIT_MESSAGES, checkLimits } from '../constants/limits';
+import { ACTION_TYPES, UI_MODE } from '../constants/uiModes';
 
 /**
- * Custom hook для работы с маршрутами
+ * Хук для работы с маршрутами
+ * @param {Object} state - Текущее состояние приложения
+ * @param {Function} dispatch - Функция dispatch для обновления состояния
+ * @returns {Object} Методы для работы с маршрутами
  */
-export const useRoutes = () => {
-    const [routes, setRoutes] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
+export const useRoutes = (state, dispatch) => {
+    const { routes } = state;
 
     /**
-     * Обработка изображений в маршрутах
-     */
-    const processRoutesFromServer = useCallback((routesData) => {
-        if (!routesData) return [];
-
-        return routesData.map(route => ({
-            ...route,
-            points: route.points.map(point => ({
-                ...point,
-                images: processImages(point.images || [])
-            }))
-        }));
-    }, []);
-
-    /**
-     * Загрузка всех маршрутов
+     * Загрузка всех маршрутов с сервера
      */
     const fetchRoutes = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-
         try {
-            console.log('📡 Fetching routes from API...');
-            const routesData = await routesApi.getAll();
-            console.log('📦 Raw API response:', routesData);
-
-            const processedData = processRoutesFromServer(routesData);
-            setRoutes(processedData);
-
-            return processedData;
-        } catch (err) {
-            console.error('❌ Ошибка загрузки маршрутов:', err);
-            setError('Не удалось загрузить маршруты.');
-            throw err;
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
+            const data = await routesApi.getAll();
+            dispatch({ type: ACTION_TYPES.FETCH_ROUTES_SUCCESS, payload: data });
+        } catch (error) {
+            console.error('Error fetching routes:', error);
+            dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
         } finally {
-            setIsLoading(false);
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
         }
-    }, [processRoutesFromServer]);
+    }, [dispatch]);
+
+    /**
+     * Начать создание нового маршрута
+     */
+    const startCreateRoute = useCallback(() => {
+        if (!checkLimits.canCreateRoute(routes.length)) {
+            alert(LIMIT_MESSAGES.MAX_ROUTES);
+            return;
+        }
+
+        const newRoute = {
+            id: `temp_${Date.now()}`,
+            name: '',
+            description: '',
+            points: []
+        };
+
+        dispatch({ type: ACTION_TYPES.SET_CURRENT_ROUTE, payload: newRoute });
+        dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: UI_MODE.CREATE_ROUTE });
+    }, [routes.length, dispatch]);
+
+    /**
+     * Начать редактирование существующего маршрута
+     */
+    const startEditRoute = useCallback((routeId) => {
+        const routeToEdit = routes.find(r => r.id === routeId);
+        if (routeToEdit) {
+            const clonedRoute = structuredClone(routeToEdit);
+            dispatch({ type: ACTION_TYPES.SET_CURRENT_ROUTE, payload: clonedRoute });
+            dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: UI_MODE.EDIT_ROUTE });
+        }
+    }, [routes, dispatch]);
+
+    /**
+     * Начать просмотр маршрута (режим только для чтения)
+     */
+    const startViewRoute = useCallback((routeId) => {
+        const routeToView = routes.find(r => r.id === routeId);
+        if (routeToView) {
+            const clonedRoute = structuredClone(routeToView);
+            dispatch({ type: ACTION_TYPES.SET_CURRENT_ROUTE, payload: clonedRoute });
+            dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: UI_MODE.VIEW_ROUTE_DETAILS });
+        }
+    }, [routes, dispatch]);
 
     /**
      * Сохранение маршрута (создание или обновление)
      */
-    const saveRoute = useCallback(async (routeData) => {
-        console.log('💾 Saving route data:', routeData);
-
-        // Валидация перед сохранением
-        if (!checkLimits.isTextLengthValid(routeData.name, LIMITS.MAX_ROUTE_NAME_LENGTH)) {
-            throw new Error(LIMIT_MESSAGES.MAX_ROUTE_NAME);
-        }
-
-        if (!checkLimits.isTextLengthValid(routeData.description, LIMITS.MAX_ROUTE_DESCRIPTION_LENGTH)) {
-            throw new Error(LIMIT_MESSAGES.MAX_ROUTE_DESCRIPTION);
-        }
-
-        setIsLoading(true);
-        setError(null);
+    const handleSaveRoute = useCallback(async (routeData) => {
+        console.log('💾 Starting route save process...');
+        console.log('💾 Route data:', routeData);
+        console.log('💾 Points with images:', routeData.points?.map(p => ({
+            name: p.name,
+            id: p.id,
+            imagesCount: p.images?.length || 0
+        })));
 
         try {
-            // Собираем изображения для загрузки
-            const imagesToUploadByPoint = [];
-            const dataToSend = {
-                name: routeData.name,
-                description: routeData.description,
-                points: routeData.points.map((point, index) => {
-                    const newImages = (point.images || []).filter(img =>
-                        typeof img === 'string' && img.startsWith('data:image')
-                    );
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
 
-                    if (newImages.length > 0) {
-                        console.log(`Point ${index} has ${newImages.length} new images to upload`);
-                        imagesToUploadByPoint.push({ pointIndex: index, images: newImages });
-                    }
-
-                    const { index: pointIndex, images, ...pointToSend } = point;
-                    return pointToSend;
-                })
-            };
-
-            console.log('Data to send to server:', dataToSend);
-
-            // Создание или обновление маршрута
-            const isExisting = typeof routeData.id === 'number';
-            const savedRoute = isExisting
-                ? await routesApi.update(routeData.id, dataToSend)
-                : await routesApi.create(dataToSend);
-
-            console.log('Route save response:', savedRoute);
-
-            // Загрузка изображений
-            if (imagesToUploadByPoint.length > 0) {
-                console.log('Uploading images for points:', imagesToUploadByPoint);
-
-                const uploadPromises = imagesToUploadByPoint.map(({ pointIndex, images }) => {
-                    const pointId = savedRoute.points[pointIndex]?.id;
-                    if (pointId && images.length > 0) {
-                        console.log(`Uploading ${images.length} images for point ${pointId}`);
-                        return pointsApi.uploadImages(pointId, images);
-                    }
-                    return Promise.resolve();
-                });
-
-                const uploadResults = await Promise.all(uploadPromises);
-                console.log('Image upload results:', uploadResults);
+            let savedRoute;
+            if (routeData.id && typeof routeData.id === 'number') {
+                // Обновление существующего маршрута
+                console.log('📝 Updating existing route:', routeData.id);
+                savedRoute = await routesApi.update(routeData.id, routeData);
+                console.log('✅ Route updated successfully:', savedRoute);
+            } else {
+                // Создание нового маршрута
+                console.log('➕ Creating new route');
+                savedRoute = await routesApi.create(routeData);
+                console.log('✅ Route created successfully:', savedRoute);
             }
 
+            console.log('📤 Starting image upload process...');
+            console.log('📤 Saved route points:', savedRoute.points);
+            console.log('📤 Original route points:', routeData.points);
+
+            // Проходим по точкам в том же порядке (индексы совпадают)
+            for (let i = 0; i < savedRoute.points.length; i++) {
+                const savedPoint = savedRoute.points[i];
+                const originalPoint = routeData.points[i];
+
+                console.log(`📤 Processing point ${i}:`, {
+                    savedPointName: savedPoint.name,
+                    savedPointId: savedPoint.id,
+                    originalPointName: originalPoint?.name,
+                    originalPointImages: originalPoint?.images?.length || 0
+                });
+
+                if (originalPoint && originalPoint.images && originalPoint.images.length > 0) {
+                    const base64Images = originalPoint.images.filter(img =>
+                        typeof img === 'string' && img.startsWith('data:image/')
+                    );
+
+                    console.log(`📤 Found ${base64Images.length} new images to upload for point ${savedPoint.id}`);
+
+                    if (base64Images.length > 0) {
+                        try {
+                            console.log(`📤 Uploading ${base64Images.length} images for point ${savedPoint.id}...`);
+                            await pointsApi.uploadImages(savedPoint.id, base64Images);
+                            console.log(`✅ Images uploaded successfully for point ${savedPoint.id}`);
+                        } catch (uploadError) {
+                            console.error(`❌ Error uploading images for point ${savedPoint.id}:`, uploadError);
+                            alert(`Ошибка при загрузке изображений для точки "${savedPoint.name}"`);
+                        }
+                    } else {
+                        console.log(`ℹ️ No new images to upload for point ${savedPoint.id}`);
+                    }
+                } else {
+                    console.log(`ℹ️ No images for point ${savedPoint.id}`);
+                }
+            }
+
+            console.log('✅ All images processed');
+
             // Перезагружаем все маршруты
-            console.log('Reloading all routes after save...');
             await fetchRoutes();
 
-            return savedRoute;
-        } catch (err) {
-            console.error('❌ Ошибка сохранения маршрута:', err);
-            const errorDetail = err.response?.data ? JSON.stringify(err.response.data) : 'Нет деталей.';
-            const errorMessage = `Не удалось сохранить маршрут. Ответ сервера: ${errorDetail}`;
-            setError(errorMessage);
-            throw new Error(errorMessage);
+            // Возвращаемся к главному списку
+            dispatch({ type: ACTION_TYPES.CLEAR_CURRENT_ROUTE });
+            dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: UI_MODE.MAIN_LIST });
+        } catch (error) {
+            console.error('❌ Error saving route:', error);
+            alert('Ошибка при сохранении маршрута. Проверьте консоль для деталей.');
+            dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
         } finally {
-            setIsLoading(false);
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
         }
-    }, [fetchRoutes]);
+    }, [dispatch, fetchRoutes]);
 
     /**
      * Удаление маршрута
      */
-    const deleteRoute = useCallback(async (routeId) => {
+    const handleDeleteRoute = useCallback(async (routeId) => {
         if (!window.confirm('Вы уверены, что хотите удалить этот маршрут?')) {
-            return false;
+            return;
         }
-
-        setIsLoading(true);
-        setError(null);
 
         try {
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
             await routesApi.delete(routeId);
-
-            // Обновляем локальное состояние
-            setRoutes(prevRoutes => prevRoutes.filter(r => r.id !== routeId));
-
-            return true;
-        } catch (err) {
-            console.error('❌ Ошибка удаления маршрута:', err);
-            setError('Не удалось удалить маршрут.');
-            throw err;
+            console.log(`✅ Route ${routeId} deleted successfully`);
+            await fetchRoutes();
+        } catch (error) {
+            console.error('Error deleting route:', error);
+            alert('Ошибка при удалении маршрута.');
+            dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
         } finally {
-            setIsLoading(false);
+            dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
         }
-    }, []);
+    }, [dispatch, fetchRoutes]);
 
     /**
-     * Проверка возможности создания нового маршрута
+     * Показать главный список маршрутов
      */
-    const canCreateRoute = useCallback(() => {
-        return checkLimits.canCreateRoute(routes.length);
-    }, [routes.length]);
+    const showMainList = useCallback(() => {
+        dispatch({ type: ACTION_TYPES.CLEAR_CURRENT_ROUTE });
+        dispatch({ type: ACTION_TYPES.CLEAR_PREVIEW_ROUTE });
+        dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: UI_MODE.MAIN_LIST });
+        dispatch({ type: ACTION_TYPES.SET_WAITING_FOR_COORDINATES, payload: false });
+        dispatch({ type: ACTION_TYPES.SET_QUICK_CREATE_MODE, payload: false });
+    }, [dispatch]);
+
+    /**
+     * Начать предпросмотр маршрута при наведении
+     */
+    const handleRouteHoverStart = useCallback((routeId) => {
+        const route = routes.find(r => r.id === routeId);
+        if (route) {
+            dispatch({ type: ACTION_TYPES.SET_PREVIEW_ROUTE, payload: route });
+        }
+    }, [routes, dispatch]);
+
+    /**
+     * Завершить предпросмотр маршрута
+     */
+    const handleRouteHoverEnd = useCallback(() => {
+        dispatch({ type: ACTION_TYPES.CLEAR_PREVIEW_ROUTE });
+    }, [dispatch]);
 
     return {
-        routes,
-        isLoading,
-        error,
         fetchRoutes,
-        saveRoute,
-        deleteRoute,
-        canCreateRoute,
-        setError
+        startCreateRoute,
+        startEditRoute,
+        startViewRoute,
+        handleSaveRoute,
+        handleDeleteRoute,
+        showMainList,
+        handleRouteHoverStart,
+        handleRouteHoverEnd,
     };
 };

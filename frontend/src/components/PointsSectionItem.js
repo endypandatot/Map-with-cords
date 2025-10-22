@@ -1,5 +1,5 @@
-import React from 'react';
-import { API_BASE_URL } from '../api';
+import React, { useMemo } from 'react';
+import { processImages } from '../utils/imageHelpers';
 
 const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
 
@@ -7,14 +7,14 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
         onEditPoint(point, index);
     };
 
-    // Обработка изображений
-    const processedImages = (point.images || []).map(img => {
-        if (typeof img === 'string') return img;
-        if (typeof img === 'object' && img !== null && img.image) {
-            return `${API_BASE_URL}${img.image}`;
-        }
-        return null;
-    }).filter(Boolean);
+    // Используем централизованную обработку изображений
+    const processedImages = useMemo(() => {
+        console.log(' PointsSectionItem processing images for:', point.name);
+        console.log(' Raw images:', point.images);
+        const processed = processImages(point.images || []);
+        console.log(' Processed images:', processed);
+        return processed;
+    }, [point.images, point.name]);
 
     const formatCoord = (coord) => {
         const num = parseFloat(coord);
@@ -40,7 +40,15 @@ const PointsSectionItem = React.memo(({ point, index, onEditPoint }) => {
             {processedImages.length > 0 && (
                 <div className="point-details-images">
                     {processedImages.slice(0, 3).map((src, idx) => (
-                        <img key={idx} src={src} alt="" />
+                        <img
+                            key={idx}
+                            src={src}
+                            alt=""
+                            onError={(e) => {
+                                console.error('❌ Image load error:', src);
+                                e.target.style.display = 'none';
+                            }}
+                        />
                     ))}
                     {processedImages.length === 4 && (
                         <div className="more-images-overlay">

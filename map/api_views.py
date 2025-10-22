@@ -3,87 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
-from django.core.files.uploadedfile import UploadedFile
-# import magic  #
-import os
 import logging
 
 from .serializers import RouteSerializer, PointSerializer, PointImageSerializer
 from .models import Route, Point, PointImage
+from .image_validation import validate_image_file
 
 # Настройка логгера
 logger = logging.getLogger(__name__)
-
-
-def validate_image_file(file):
-    """
-    Комплексная проверка файла изображения на бэкенде
-    Проверяет: размер, расширение, MIME-тип (без magic bytes)
-    """
-    errors = []
-    logger.info(f"\n{'=' * 60}")
-    logger.info(f"🔍 VALIDATING FILE: {file.name}")
-    logger.info(f"{'=' * 60}")
-
-    # 1. Проверка размера файла (максимум 1 МБ)
-    MAX_SIZE = 1 * 1024 * 1024  # 1 MB
-    file_size_mb = file.size / (1024 * 1024)
-    logger.info(f"📦 File size: {file.size} bytes ({file_size_mb:.2f} MB)")
-
-    if file.size > MAX_SIZE:
-        error_msg = f'Файл {file.name} слишком большой ({file_size_mb:.2f} МБ). Максимум: 1 МБ'
-        logger.error(f"❌ {error_msg}")
-        errors.append(error_msg)
-
-    # 2. Проверка расширения файла
-    valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
-    file_ext = os.path.splitext(file.name.lower())[1]
-    logger.info(f"📄 File extension: {file_ext}")
-
-    if file_ext not in valid_extensions:
-        error_msg = f'Файл {file.name} имеет недопустимое расширение. Разрешены: {", ".join(valid_extensions)}'
-        logger.error(f"❌ {error_msg}")
-        errors.append(error_msg)
-
-    # 3. Проверка MIME-типа из заголовка
-    valid_mime_types = [
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
-        'image/webp', 'image/bmp'
-    ]
-    logger.info(f"🏷️  Content-Type (from header): {file.content_type}")
-
-    if file.content_type.lower() not in valid_mime_types:
-        error_msg = f'Файл {file.name} имеет недопустимый MIME-тип: {file.content_type}'
-        logger.error(f"❌ {error_msg}")
-        errors.append(error_msg)
-
-
-    # try:
-    #     file.seek(0)
-    #     file_header = file.read(8192)
-    #     file.seek(0)
-    #     mime = magic.from_buffer(file_header, mime=True)
-    #     logger.info(f"🔬 Real MIME type (magic bytes): {mime}")
-    #     if not mime.startswith('image/'):
-    #         error_msg = f'Файл {file.name} не является изображением (определён как: {mime})'
-    #         logger.error(f"❌ {error_msg}")
-    #         errors.append(error_msg)
-    # except Exception as e:
-    #     error_msg = f'Ошибка проверки файла {file.name}: {str(e)}'
-    #     logger.error(f"❌ {error_msg}")
-    #     errors.append(error_msg)
-
-    logger.info(f"⚠️  Magic bytes validation SKIPPED (python-magic not configured)")
-
-    if errors:
-        logger.error(f"❌ VALIDATION FAILED with {len(errors)} error(s)")
-        for i, err in enumerate(errors, 1):
-            logger.error(f"   {i}. {err}")
-    else:
-        logger.info(f"✅ VALIDATION PASSED")
-
-    logger.info(f"{'=' * 60}\n")
-    return errors
 
 
 class RouteViewSet(viewsets.ModelViewSet):

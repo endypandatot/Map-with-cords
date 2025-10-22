@@ -1,8 +1,15 @@
-# map/serializers.ъ
 from rest_framework import serializers
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from .models import Route, Point, PointImage
+from .image_validation import (
+    is_valid_image_extension,
+    is_valid_mime_type,
+    is_valid_image_size,
+    get_allowed_formats_string,
+    MAX_IMAGE_SIZE_MB,
+    ALLOWED_MIME_TYPES
+)
 
 
 class PointImageSerializer(serializers.ModelSerializer):
@@ -12,31 +19,25 @@ class PointImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def validate_image(self, value):
-        """Валидация изображения"""
-        # Проверка размера файла (максимум 30 МБ)
-        max_size = 30 * 1024 * 1024  # 30 MB
-        if value.size > max_size:
+        """Валидация изображения с использованием единых констант"""
+        # Проверка размера файла
+        if not is_valid_image_size(value.size):
             raise serializers.ValidationError(
-                f'Размер файла не должен превышать 30 МБ. Текущий размер: {value.size / (1024 * 1024):.2f} МБ'
+                f'Размер файла не должен превышать {MAX_IMAGE_SIZE_MB} МБ. '
+                f'Текущий размер: {value.size / (1024 * 1024):.2f} МБ'
             )
 
         # Проверка расширения файла
-        valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.tif', '.heic', '.heif']
-        file_name = value.name.lower()
-        if not any(file_name.endswith(ext) for ext in valid_extensions):
+        if not is_valid_image_extension(value.name):
             raise serializers.ValidationError(
-                f'Недопустимое расширение файла. Разрешены: {", ".join(valid_extensions)}'
+                f'Недопустимое расширение файла. Разрешены: {get_allowed_formats_string()}'
             )
 
         # Проверка MIME-типа
-        valid_mime_types = [
-            'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
-            'image/webp', 'image/bmp', 'image/svg+xml', 'image/tiff',
-            'image/heic', 'image/heif'
-        ]
-        if value.content_type.lower() not in valid_mime_types:
+        if not is_valid_mime_type(value.content_type):
             raise serializers.ValidationError(
-                f'Недопустимый тип файла: {value.content_type}. Разрешены только изображения.'
+                f'Недопустимый тип файла: {value.content_type}. '
+                f'Разрешены: {", ".join(ALLOWED_MIME_TYPES)}'
             )
 
         return value
@@ -88,7 +89,7 @@ class PointSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Общая валидация данных точки"""
-        # ЗАЩИТА read_only полей от изменения
+        # защита read_only полей от изменения
         if self.instance:  # При обновлении
             # Проверяем, что пользователь не пытается изменить read_only поля
             request_data = self.context.get('request').data if self.context.get('request') else {}
@@ -132,7 +133,7 @@ class RouteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Общая валидация данных маршрута"""
-        # ЗАЩИТА read_only полей от изменения
+        # защита read_only полей от изменения
         if self.instance:  # При обновлении
             request_data = self.context.get('request').data if self.context.get('request') else {}
 

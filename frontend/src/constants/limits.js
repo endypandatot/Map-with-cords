@@ -1,3 +1,10 @@
+import {
+    isValidImageExtension,
+    isValidImageSize,
+    MAX_IMAGE_SIZE_MB,
+    getAllowedFormatsString
+} from './imageValidation';
+
 export const LIMITS = {
     MAX_ROUTES: 5,
     MAX_POINTS_PER_ROUTE: 20,
@@ -6,7 +13,7 @@ export const LIMITS = {
     MAX_ROUTE_DESCRIPTION_LENGTH: 1000,
     MAX_POINT_NAME_LENGTH: 200,
     MAX_POINT_DESCRIPTION_LENGTH: 1000,
-    MAX_IMAGE_SIZE_MB: 1,
+    MAX_IMAGE_SIZE_MB: MAX_IMAGE_SIZE_MB,
 };
 
 export const LIMIT_MESSAGES = {
@@ -18,7 +25,7 @@ export const LIMIT_MESSAGES = {
     MAX_POINT_NAME: `Название точки не должно превышать ${LIMITS.MAX_POINT_NAME_LENGTH} символов.`,
     MAX_POINT_DESCRIPTION: `Описание точки не должно превышать ${LIMITS.MAX_POINT_DESCRIPTION_LENGTH} символов.`,
     MAX_IMAGE_SIZE: `Размер изображения не должен превышать ${LIMITS.MAX_IMAGE_SIZE_MB} МБ.`,
-    INVALID_IMAGE_FORMAT: `Разрешены только изображения форматов: JPG, JPEG, PNG, GIF, WEBP, BMP`,
+    INVALID_IMAGE_FORMAT: `Разрешены только изображения форматов: ${getAllowedFormatsString()}`,
 };
 
 export const checkLimits = {
@@ -40,13 +47,10 @@ export const checkLimits = {
     },
 
     isImageSizeValid: (sizeInBytes) => {
-        const sizeInMB = sizeInBytes / (1024 * 1024);
-        return sizeInMB <= LIMITS.MAX_IMAGE_SIZE_MB;
+        return isValidImageSize(sizeInBytes);
     },
 
     isImageFormatValid: (fileName) => {
-        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-        const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
-        return validExtensions.includes(extension);
+        return isValidImageExtension(fileName);
     }
 };
