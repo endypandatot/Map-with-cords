@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Допустимые форматы изображений (синхронизировано с фронтендом)
+# Допустимые форматы изображений
 ALLOWED_IMAGE_FORMATS = [
     '.jpg',
     '.jpeg',
@@ -17,7 +17,7 @@ ALLOWED_IMAGE_FORMATS = [
     '.bmp'
 ]
 
-# Допустимые MIME-типы (синхронизировано с фронтендом)
+# Допустимые MIME-типы
 ALLOWED_MIME_TYPES = [
     'image/jpeg',
     'image/jpg',

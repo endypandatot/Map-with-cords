@@ -1,4 +1,3 @@
-
 // Импорты должны быть в начале файла
 import { routesApi } from './routes';
 import { pointsApi } from './points';
