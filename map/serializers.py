@@ -91,7 +91,6 @@ class PointSerializer(serializers.ModelSerializer):
         """Общая валидация данных точки"""
         # защита read_only полей от изменения
         if self.instance:  # При обновлении
-            # Проверяем, что пользователь не пытается изменить read_only поля
             request_data = self.context.get('request').data if self.context.get('request') else {}
 
             if 'id' in request_data and request_data['id'] != self.instance.id:
