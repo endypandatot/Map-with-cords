@@ -778,3 +778,249 @@ body, html {
 .context-menu-item span {
     white-space: nowrap;
 }
+
+/* ==================== ПОЛЬЗОВАТЕЛЬСКОЕ МЕНЮ И АВТОРИЗАЦИЯ ==================== */
+
+.user-menu {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.9);
+    padding: 8px 16px;
+    border-radius: 30px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.user-name {
+    color: #30372D;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.logout-btn {
+    background: #536C45;
+    border: none;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.user-icon-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+/* Рамки для подписок */
+.user-menu.premium-border {
+    border: 2px solid #3498db;
+    background: rgba(255,255,255,0.95);
+}
+.user-menu.max-border {
+    border: 2px solid #e74c3c;
+    background: rgba(255,255,255,0.95);
+}
+
+/* Модальное окно авторизации */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+.auth-modal {
+    background: #FDF9F6;
+    border-radius: 16px;
+    width: 400px;
+    padding: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.auth-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: 24px;
+}
+.close-modal-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #30372D;
+}
+.auth-modal input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(48,55,45,0.16);
+    border-radius: 6px;
+    background: #FDF9F6;
+    font-size: 14px;
+}
+.auth-submit {
+    width: 100%;
+    background: #536C45;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 8px;
+}
+.auth-error {
+    color: #c33939;
+    font-size: 12px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+.auth-switch {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+}
+.auth-switch button {
+    background: none;
+    border: none;
+    color: #536C45;
+    cursor: pointer;
+    margin-left: 8px;
+    text-decoration: underline;
+}
+
+.profile-modal {
+    background: #FDF9F6;
+    border-radius: 20px;
+    width: 800px;
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+.profile-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(48, 55, 45, 0.16);
+}
+
+.profile-modal-body {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.profile-info {
+    flex: 1;
+    min-width: 200px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.profile-info h3,
+.subscription-plans h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: #30372D;
+}
+
+.profile-info p {
+    margin: 10px 0;
+    font-size: 14px;
+    color: #30372D;
+}
+
+.subscription-status {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(48, 55, 45, 0.1);
+}
+
+.subscription-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.subscription-badge.free { background: #e0e0e0; color: #30372D; }
+.subscription-badge.premium { background: #3498db; color: white; }
+.subscription-badge.max { background: #e74c3c; color: white; }
+
+.subscription-plans {
+    flex: 2;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.plan-card {
+    flex: 1;
+    min-width: 160px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+.plan-card:hover {
+    transform: translateY(-4px);
+}
+.plan-card h4 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+.plan-card p {
+    font-size: 13px;
+    color: #666;
+    margin: 6px 0;
+}
+.plan-card button {
+    margin-top: 16px;
+    background: #536C45;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+.plan-card button:hover:not(:disabled) {
+    background: #3e5a32;
+}
+.plan-card button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+.plan-card.free { border-top: 4px solid #9e9e9e; }
+.plan-card.premium { border-top: 4px solid #3498db; }
+.plan-card.max { border-top: 4px solid #e74c3c; }

@@ -3,6 +3,7 @@ import { appReducer, initialState } from '../reducers/appReducer';
 import { useRoutes } from '../hooks/useRoutes';
 import { usePoints } from '../hooks/usePoints';
 import { useMapInteraction } from '../hooks/useMapInteraction';
+import { useAuth } from './AuthContext';
 
 /**
  * Контекст для управления маршрутами и точками
@@ -15,15 +16,19 @@ export const RouteContext = createContext();
 export const RouteProvider = ({ children }) => {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
-    // Подключаем хуки
-    const routeHandlers = useRoutes(state, dispatch);
+    // Получаем данные авторизации
+    const { user } = useAuth();
+    const isAuthenticated = !!user;
+
+    // Подключаем хуки, передавая isAuthenticated в useRoutes
+    const routeHandlers = useRoutes(state, dispatch, isAuthenticated);
     const pointHandlers = usePoints(state, dispatch);
     const mapHandlers = useMapInteraction(state, dispatch);
 
-    // Загрузка маршрутов при монтировании
+    // Загрузка маршрутов при монтировании и при изменении статуса авторизации
     useEffect(() => {
         routeHandlers.fetchRoutes();
-    }, []);
+    }, [isAuthenticated, routeHandlers.fetchRoutes]);
 
     // Логирование изменений currentRoute (для отладки)
     useEffect(() => {

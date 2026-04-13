@@ -16,12 +16,6 @@ export const initialState = {
     quickCreateMode: false,
 };
 
-/**
- * Редьюсер для управления состоянием приложения
- * @param {Object} state - Текущее состояние
- * @param {Object} action - Действие с типом и payload
- * @returns {Object} Новое состояние
- */
 export function appReducer(state, action) {
     switch (action.type) {
         // Загрузка и ошибки
@@ -89,6 +83,18 @@ export function appReducer(state, action) {
 
         case ACTION_TYPES.SET_QUICK_CREATE_MODE:
             return { ...state, quickCreateMode: action.payload };
+
+        // НОВЫЕ КЕЙСЫ ДЛЯ АНОНИМНЫХ ДЕЙСТВИЙ
+        case ACTION_TYPES.ADD_ROUTE:
+            return { ...state, routes: [...state.routes, action.payload] };
+
+        case ACTION_TYPES.UPDATE_ROUTE:
+            return { ...state, routes: state.routes.map(route =>
+                route.id === action.payload.id ? action.payload : route
+            ) };
+
+        case ACTION_TYPES.DELETE_ROUTE:
+            return { ...state, routes: state.routes.filter(route => route.id !== action.payload) };
 
         default:
             return state;

@@ -13,9 +13,10 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { LIMITS, LIMIT_MESSAGES, checkLimits } from '../constants/limits';
+import { LIMITS, LIMIT_MESSAGES } from '../constants/limits';
 import PointsSectionItem from './PointsSectionItem';
 import AddPointIcon from './SvgIcons/AddPointIcon';
+import { useAuth } from '../contexts/AuthContext';  // добавлено
 
 console.log('PointsSection.js loaded!');
 
@@ -29,6 +30,9 @@ function PointsSection({
     isViewMode,
     waitingForCoordinates
 }) {
+    const { profile } = useAuth();  // добавлено
+    const maxPointsPerRoute = profile?.max_points_per_route || LIMITS.MAX_POINTS_PER_ROUTE;  // добавлено
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
@@ -54,16 +58,16 @@ function PointsSection({
     };
 
     const handleAddPointWithMapClick = () => {
-        if (!checkLimits.canAddPoint(points.length)) {
-            alert(LIMIT_MESSAGES.MAX_POINTS);
+        if (points.length >= maxPointsPerRoute) {   // изменено
+            alert(`Достигнут лимит точек в маршруте (${maxPointsPerRoute}). Обновите подписку.`);
             return;
         }
         onAddPointWithMapClick();
     };
 
     const handleAddPointManual = () => {
-        if (!checkLimits.canAddPoint(points.length)) {
-            alert(LIMIT_MESSAGES.MAX_POINTS);
+        if (points.length >= maxPointsPerRoute) {   // изменено
+            alert(`Достигнут лимит точек в маршруте (${maxPointsPerRoute}). Обновите подписку.`);
             return;
         }
         onAddPointManual();
@@ -72,18 +76,18 @@ function PointsSection({
     return (
         <div className="points-section">
             <div className="points-section-header">
-                <label>Точки маршрута ({points.length}/{LIMITS.MAX_POINTS_PER_ROUTE})</label>
+                <label>Точки маршрута ({points.length}/{maxPointsPerRoute})</label>   {/* изменено */}
                 {!isViewMode && (
                     <div className="add-point-buttons">
                         <button
                             className={`add-point-btn ${waitingForCoordinates ? 'waiting' : ''}`}
                             onClick={handleAddPointWithMapClick}
-                            disabled={!checkLimits.canAddPoint(points.length)}
+                            disabled={points.length >= maxPointsPerRoute}
                             title={
                                 waitingForCoordinates
                                     ? 'Кликните на карту'
-                                    : !checkLimits.canAddPoint(points.length)
-                                    ? LIMIT_MESSAGES.MAX_POINTS
+                                    : points.length >= maxPointsPerRoute
+                                    ? `Лимит точек (${maxPointsPerRoute}) достигнут`
                                     : 'Добавить точку через карту'
                             }
                         >
@@ -93,10 +97,10 @@ function PointsSection({
                         <button
                             className="add-point-manual-btn"
                             onClick={handleAddPointManual}
-                            disabled={!checkLimits.canAddPoint(points.length)}
+                            disabled={points.length >= maxPointsPerRoute}
                             title={
-                                !checkLimits.canAddPoint(points.length)
-                                    ? LIMIT_MESSAGES.MAX_POINTS
+                                points.length >= maxPointsPerRoute
+                                    ? `Лимит точек (${maxPointsPerRoute}) достигнут`
                                     : 'Добавить точку вручную'
                             }
                         >

@@ -6,6 +6,7 @@ import PointsSectionItem from './PointsSectionItem';
 import CustomScrollbar from './CustomScrollbar';
 import { processImages } from '../utils/imageHelpers';
 import { LIMITS } from '../constants/limits';
+import { useAuth } from '../contexts/AuthContext';  // добавлено
 
 const FormRoutePointItem = React.memo(({ point, index, isViewMode, onEdit, onDelete, onDragStart, onDragOver, onDragLeave, onDrop, isDragging, dragOverPosition }) => {
     const pointRef = useRef(null);
@@ -93,6 +94,9 @@ function RouteCreationForm({
     const contextMenuRef = useRef(null);
     const shortListRef = useRef(null);
     const detailedListRef = useRef(null);
+
+    const { profile } = useAuth();  // добавлено
+    const maxPointsPerRoute = profile?.max_points_per_route || LIMITS.MAX_POINTS_PER_ROUTE;  // добавлено
 
     useEffect(() => {
         if (initialRoute) {
@@ -233,7 +237,7 @@ function RouteCreationForm({
                 </div>
             ) : (
                 <div className="points-add-section-top">
-                    <span className="points-counter-top">{routePoints.length} / {LIMITS.MAX_POINTS_PER_ROUTE} точки</span>
+                    <span className="points-counter-top">{routePoints.length} / {maxPointsPerRoute} точки</span>   {/* изменено */}
                     <div style={{ position: 'relative' }} ref={contextMenuRef}>
                         <div
                             className={`points-section-add-btn ${waitingForCoordinates ? 'waiting' : ''}`}

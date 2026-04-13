@@ -2,6 +2,8 @@ from rest_framework import serializers
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from .models import Route, Point, PointImage
+from .models import UserProfile
+from django.utils import timezone
 from .image_validation import (
     is_valid_image_extension,
     is_valid_mime_type,
@@ -108,10 +110,11 @@ class PointSerializer(serializers.ModelSerializer):
 
 class RouteSerializer(serializers.ModelSerializer):
     points = PointSerializer(many=True, read_only=True)
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Route
-        fields = ['id', 'name', 'description', 'points', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'points', 'created_at', 'updated_at', 'user']  # добавить 'user'
         read_only_fields = ['id', 'created_at', 'updated_at', 'points']
 
     def validate_name(self, value):
@@ -232,3 +235,43 @@ class RouteSerializer(serializers.ModelSerializer):
                 point.delete()
 
         return instance
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    routes_count = serializers.SerializerMethodField()
+    max_routes = serializers.SerializerMethodField()
+    max_points_per_route = serializers.SerializerMethodField()
+    subscription_active = serializers.SerializerMethodField()
+    days_left = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'username', 'email', 'first_name', 'last_name',
+            'subscription_type', 'subscription_until',
+            'routes_count', 'max_routes', 'max_points_per_route',
+            'subscription_active', 'days_left'
+        ]
+
+    def get_routes_count(self, obj):
+        return obj.user.routes.count()
+
+    def get_max_routes(self, obj):
+        from .subscription_limits import get_max_routes  # определим ниже
+        return get_max_routes(obj.get_subscription_status())
+
+    def get_max_points_per_route(self, obj):
+        from .subscription_limits import get_max_points_per_route
+        return get_max_points_per_route(obj.get_subscription_status())
+
+    def get_subscription_active(self, obj):
+        return obj.is_subscription_active()
+
+    def get_days_left(self, obj):
+        if not obj.is_subscription_active():
+            return 0
+        delta = obj.subscription_until - timezone.now()
+        return max(delta.days, 0)

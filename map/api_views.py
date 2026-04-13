@@ -2,9 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 import logging
 
+from .subscription_limits import get_max_routes, get_max_points_per_route
 from .serializers import RouteSerializer, PointSerializer, PointImageSerializer
 from .models import Route, Point, PointImage
 from .image_validation import validate_image_file
@@ -15,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class RouteViewSet(viewsets.ModelViewSet):
     queryset = Route.objects.prefetch_related('points__images').all()
+    permission_classes = [IsAuthenticated]
     serializer_class = RouteSerializer
 
     def get_serializer_context(self):
@@ -23,6 +26,34 @@ class RouteViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def get_queryset(self):
+        return Route.objects.filter(user=self.request.user).prefetch_related('points__images')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        profile = user.profile
+        current_routes_count = user.routes.count()
+        max_routes = get_max_routes(profile.get_subscription_status())
+        if current_routes_count >= max_routes:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(
+                {'detail': f'Максимальное количество маршрутов ({max_routes}) достигнуто. Обновите подписку.'})
+        serializer.save(user=user)
+
+    def update(self, request, *args, **kwargs):
+        # При обновлении маршрута проверяем количество точек
+        instance = self.get_object()
+        points_data = request.data.get('points', [])
+        profile = request.user.profile
+        max_points = get_max_points_per_route(profile.get_subscription_status())
+        if len(points_data) > max_points:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(
+                {'points': f'Максимум точек в маршруте: {max_points} (ваш тариф: {profile.subscription_type})'})
+        return super().update(request, *args, **kwargs)
 
 class PointViewSet(viewsets.ModelViewSet):
     queryset = Point.objects.prefetch_related('images').all()

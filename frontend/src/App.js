@@ -8,6 +8,8 @@ import PointCreationForm from './components/PointCreationForm';
 import YandexMap from './components/YandexMap';
 import AddRouteIcon from './components/SvgIcons/AddRouteIcon';
 import CustomScrollbar from './components/CustomScrollbar';
+import UserMenu from './components/UserMenu';
+import { AuthProvider } from './contexts/AuthContext';
 
 /**
  * Компонент содержимого приложения (внутри провайдера)
@@ -113,6 +115,7 @@ function AppContent() {
                 {renderSidebarContent()}
             </div>
             <div className="map-container">
+                <UserMenu />
                 <YandexMap
                     currentRoute={currentRoute}
                     previewRoute={previewRoute}
@@ -133,9 +136,11 @@ function AppContent() {
  */
 function App() {
     return (
-        <RouteProvider>
-            <AppContent />
-        </RouteProvider>
+        <AuthProvider>
+            <RouteProvider>
+                <AppContent />
+            </RouteProvider>
+        </AuthProvider>
     );
 }
 

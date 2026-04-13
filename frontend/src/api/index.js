@@ -5,6 +5,9 @@ import { pointsApi } from './points';
 // Экспортируем базовый клиент и константы
 export { default as apiClient, API_BASE_URL } from './client';
 
+// Экспортируем аунтификацию
+export { authApi } from './auth';
+
 // Экспортируем API модули
 export { routesApi } from './routes';
 export { pointsApi } from './points';

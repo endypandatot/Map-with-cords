@@ -146,7 +146,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
@@ -161,22 +161,18 @@ TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
 USE_TZ = True
 
-
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024
 FILE_UPLOAD_PERMISSIONS = 0o644
-
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

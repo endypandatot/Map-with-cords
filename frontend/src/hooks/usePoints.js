@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { LIMITS, LIMIT_MESSAGES, checkLimits } from '../constants/limits';
 import { ACTION_TYPES, UI_MODE } from '../constants/uiModes';
+import { useAuth } from '../contexts/AuthContext';   // добавлено
 
 /**
  * Хук для работы с точками маршрута
@@ -10,27 +11,29 @@ import { ACTION_TYPES, UI_MODE } from '../constants/uiModes';
  */
 export const usePoints = (state, dispatch) => {
     const { currentRoute, quickCreateMode } = state;
+    const { profile } = useAuth();   // добавлено
+    const maxPointsPerRoute = profile?.max_points_per_route || LIMITS.MAX_POINTS_PER_ROUTE;   // добавлено
 
     /**
      * Начать создание точки через клик на карте
      */
     const startCreatePointWithMapClick = useCallback(() => {
         const currentPointsCount = currentRoute?.points?.length || 0;
-        if (!checkLimits.canAddPoint(currentPointsCount)) {
-            alert(LIMIT_MESSAGES.MAX_POINTS);
+        if (currentPointsCount >= maxPointsPerRoute) {   // изменено
+            alert(`Достигнут лимит точек в маршруте (${maxPointsPerRoute}). Обновите подписку.`);
             return;
         }
         console.log('Activating map click mode for point creation...');
         dispatch({ type: ACTION_TYPES.SET_WAITING_FOR_COORDINATES, payload: true });
-    }, [currentRoute, dispatch]);
+    }, [currentRoute, maxPointsPerRoute, dispatch]);
 
     /**
      * Начать создание точки вручную (без карты)
      */
     const startCreatePointManual = useCallback(() => {
         const currentPointsCount = currentRoute?.points?.length || 0;
-        if (!checkLimits.canAddPoint(currentPointsCount)) {
-            alert(LIMIT_MESSAGES.MAX_POINTS);
+        if (currentPointsCount >= maxPointsPerRoute) {   // изменено
+            alert(`Достигнут лимит точек в маршруте (${maxPointsPerRoute}). Обновите подписку.`);
             return;
         }
         console.log('Starting manual point creation (empty form)');
@@ -48,7 +51,7 @@ export const usePoints = (state, dispatch) => {
             }
         });
         dispatch({ type: ACTION_TYPES.SET_WAITING_FOR_COORDINATES, payload: false });
-    }, [currentRoute, dispatch]);
+    }, [currentRoute, maxPointsPerRoute, dispatch]);
 
     /**
      * Начать редактирование существующей точки
@@ -91,6 +94,12 @@ export const usePoints = (state, dispatch) => {
             uiModeAfterSave = UI_MODE.CREATE_ROUTE;
         }
 
+        // Проверка лимита перед добавлением новой точки
+        if (pointIndex === null && targetRoute.points.length >= maxPointsPerRoute) {
+            alert(`Достигнут лимит точек в маршруте (${maxPointsPerRoute}). Обновите подписку.`);
+            return;
+        }
+
         const updatedPoints = (pointIndex !== null && typeof targetRoute.points[pointIndex] !== 'undefined')
             ? targetRoute.points.map((p, idx) => idx === pointIndex ? { ...p, ...pointData } : p)
             : [...targetRoute.points, { ...pointData, id: `temp_point_${Date.now()}` }];
@@ -102,7 +111,7 @@ export const usePoints = (state, dispatch) => {
         });
         dispatch({ type: ACTION_TYPES.SET_UI_MODE, payload: uiModeAfterSave });
         dispatch({ type: ACTION_TYPES.CLEAR_POINT_TO_EDIT });
-    }, [currentRoute, dispatch]);
+    }, [currentRoute, maxPointsPerRoute, dispatch]);
 
     /**
      * Удаление точки из текущего маршрута
